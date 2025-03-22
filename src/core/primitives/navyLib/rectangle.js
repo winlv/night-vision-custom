@@ -26,7 +26,7 @@ export default class Rectangle {
         this.rectangle.update(this.data.p1, this.data.p2)
         ctx.lineWidth = this.data.lineWidth ?? 1;
         ctx.strokeStyle = this.data.color ?? '#dc9800';
-        ctx.fillStyle = (this.data.fillColor ?? '#dc980010') + '20'
+        ctx.fillStyle = (this.data.fillColor ?? '#dc9800') + '20'
         
         ctx.beginPath()
         this.rectangle.draw(ctx);

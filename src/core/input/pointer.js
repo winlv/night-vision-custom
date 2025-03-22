@@ -152,7 +152,14 @@ export default class Input {
             //     this.propagate("mousemove", this.touch2mouse(event));
             // }
             if (this.drug) {
-                this.handleMousedrag(this.drug.x + event.deltaX, this.drug.y + event.deltaY);
+                if (Utils.isMobile) {
+                    this.handleMousedrag(this.drug.x + event.deltaX, this.drug.y + event.deltaY);
+                } else {
+                    this.mousedrag(
+                        this.drug.x + event.deltaX,
+                        this.drug.y + event.deltaY,
+                    )
+                }
                 /*this.events.emit('cursor-changed', {
                             gridId: this.gridId,
                             x: event.center.x + this.offsetX,

@@ -2,7 +2,7 @@
 
 prop('color', {type: 'string', def: '#cccccc'});
 prop('lineWidth', {type: 'number', def: 2});
-prop('lineType', {type: 'string', def: 'dashed'});
+prop('lineType', {type: 'string', def: 'solid'});
 prop('fillColor', {type: 'string', def: '#ffffff'});
 
 let timeId = null;
