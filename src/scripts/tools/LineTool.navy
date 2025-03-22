@@ -5,10 +5,12 @@
 
 prop('color', {type: 'string', def: '#dc9800'});
 prop('lineWidth', {type: 'number', def: 1});
+prop('lineType', {type: 'string', def: 'solid'});
 
 let timeId = null
 let mouseX = 0
 let lines = {} // Line objects stored by uuid
+let state = 'idle';
 
 init()
 {
@@ -49,6 +51,7 @@ newLine()
         p1: [t, $],
         p2: [t, $],
         lineWidth: $props.lineWidth,
+        lineType: $props.lineType,
         color: $props.color,
         uuid: uuid
     }
@@ -77,7 +80,7 @@ lineSelected($uuid)
         const selected = uuid === $uuid;
         lines[uuid].selected = selected;
         if (selected) {
-            $events.emit('object-selected', {id: uuid, type: 'LineTool'});
+            setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'LineTool'}));
         }
     }
 
@@ -122,6 +125,13 @@ propagate(name, data)
 
 mousedown(event)
 {
+    if (unfinishedLines()) {
+        $events.emit('update-layout');
+        propagate('mousedown', event);
+        $events.emit('drawing-mode-off');
+        return void 0;
+    }
+
     const timeout = $core.meta.tool === 'LineTool' ? 0 : 50000;
     timeId = setTimeout(newLine, timeout)
     mouseX = $core.mouse.x
@@ -135,7 +145,6 @@ mouseup(event)
     clearTimeout(timeId)
     timeId = null
     propagate('mouseup', event)
-    $events.emit('drawing-mode-off');
 
     let s = Object.values(lines).find(x => x.selected);
     if (s) {
@@ -144,6 +153,7 @@ mouseup(event)
             id: $core.id
         });
     }
+
 }
 
 mousemove(event)

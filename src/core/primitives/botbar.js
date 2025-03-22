@@ -17,6 +17,7 @@ function body(props, layout, ctx) {
     const sb0 = layout.main.sbMax[0]
     const sb1 = layout.main.sbMax[1]
 
+
     ctx.font = props.config.FONT
     ctx.clearRect(0, 0, width, height)
 

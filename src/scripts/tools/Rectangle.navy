@@ -2,6 +2,8 @@
 
 prop('color', {type: 'string', def: '#cccccc'});
 prop('lineWidth', {type: 'number', def: 2});
+prop('lineType', {type: 'string', def: 'dashed'});
+prop('fillColor', {type: 'string', def: '#ffffff'});
 
 let timeId = null;
 let mouseX = 0;
@@ -34,6 +36,13 @@ function keydown(event) {
 }
 
 function mousedown(event) {
+    if (unfinishedRectangles()) {
+        $events.emit('update-layout');
+        propagate('mousedown', event);
+        $events.emit('drawing-mode-off');
+        return void 0;
+    }
+
     if ($core.meta.tool !== 'Rectangle') {
         rectangleSelected(null);
         $events.emit('update-layout');
@@ -73,7 +82,7 @@ function mouseMoved() {
 
 function unfinishedRectangles() {
     for (const rectangle of Object.values(rectangles)) {
-        if (rectangle.state === 'dragging') {
+        if (rectangle.state === 'tracking') {
             return true
         }
     }
@@ -116,6 +125,8 @@ function newRectangle() {
         p4: [time, yValue],
         lineWidth: $props.lineWidth,
         color: $props.color,
+        fillColor: $props.fillColor,
+        lineType: $props.lineType,
         uuid: uuid
     };
 
@@ -150,7 +161,7 @@ function rectangleSelected($uuid) {
         const selected = uuid === $uuid;
         rectangles[uuid].selected = selected;
         if (selected) {
-            $events.emit('object-selected', {id: uuid, type: 'Rectangle'});
+            setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'Rectangle'}));
         }
     }
 

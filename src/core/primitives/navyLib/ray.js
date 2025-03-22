@@ -24,8 +24,10 @@ export default class Ray {
 
     // TODO: fix for index-based
     draw(ctx) {
-        ctx.moveTo(this.x1, this.y1)
-        ctx.lineTo(this.x2, this.y2)
+        ctx.beginPath()
+        ctx.moveTo(this.x1, this.y1);
+        ctx.lineTo(this.x2, this.y2);
+        ctx.closePath();
     }
 
     collision(x, y) {

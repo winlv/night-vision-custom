@@ -69,7 +69,7 @@
                 SCROLL_WHEEL: 'prevent',
                 scrollLock: true,
                 SBMAX: 500,
-                DEFAULT_LEN: 150,
+                DEFAULT_LEN: 250,
                 meta: {
                     scrollLock: true
                 }
@@ -129,22 +129,59 @@
 
     })
 
+    function onClick(type) {
+        chart.events.emit('tool-selected', {type});
+    }
+
 </script>
 <style>
     .app {
-        width: 1080px;
-        height: 720px;
+        width: 100vw;
+        height: 100vh;
         margin: 0 auto;
         position: relative;
         overflow: hidden;
     }
 
+    .toolbar {
+        position: absolute;
+        left: 0;
+        width: 100px;
+        height: 100%;
+        background: #000;
+    }
+
+    .toolbar ul {
+        margin: 0;
+        padding: 0;
+    }
+
+    .toolbar li {
+        list-style: none;
+        cursor: pointer;
+        background-color: #151414;
+        padding: 5px;
+    }
+
     #chart-container {
         position: absolute;
-        width: 100%;
+        width: calc(100% - 100px);
+        left: 100px;
         height: 100%;
     }
 </style>
+
 <div class="app">
+    <div class="toolbar">
+        <ul>
+            <li on:click={() => onClick('Cursor')}>cursor</li>
+            <li on:click={() => onClick('Brush')}>brush</li>
+            <li on:click={() => onClick('LineTool')}>segment</li>
+            <li on:click={() => onClick('LineToolHorizontalRay')}>ray</li>
+            <li on:click={() => onClick('Rectangle')}>rectangle</li>
+            <li on:click={() => onClick('RangeTool')}>measure</li>
+            <li>magnet</li>
+        </ul>
+    </div>
     <div id="chart-container"></div>
 </div>

@@ -4,6 +4,7 @@ import Brush from "../../core/primitives/navyLib/brush.js";
 
 prop('color', {type: 'string', def: '#ccc'});
 prop('lineWidth', {type: 'number', def: 2});
+prop('lineType', {type: 'string', def: 'solid'});
 
 let timeId = null;
 let mouseX = 0;
@@ -162,7 +163,7 @@ function brushSelected($uuid) {
         const selected = uuid === $uuid;
         brushes[uuid].selected = selected;
         if (selected) {
-            $events.emit('object-selected', {id: uuid, type: 'Brush'});
+            setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'Brush'}));
         }
     }
 

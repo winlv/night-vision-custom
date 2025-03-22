@@ -75,8 +75,10 @@ class MetaHub {
     }
 
     destroyHeatmap() {
-        this.heatmap.destroy();
-        this.heatmap = undefined;
+        if (this.heatmap) {
+            this.heatmap.destroy();
+            this.heatmap = undefined;
+        }
     }
 
     resetHeatmap() {
@@ -118,13 +120,6 @@ class MetaHub {
     }
 
     drawingModeOff = () => {
-        if (this.tool === 'Brush') {
-            return void 0;
-        }
-        if (this.tool === 'Magnet') {
-            return void 0;
-        }
-
         this.tool = 'Cursor';
         this.drawingMode = false;
     }
@@ -285,7 +280,6 @@ class MetaHub {
     }
 
     // EVENT HANDLERS
-
     // User changed y-range
     onYTransform(event) {
         let yts = this.yTransforms[event.gridId] || {}

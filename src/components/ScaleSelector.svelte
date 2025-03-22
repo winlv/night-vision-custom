@@ -70,6 +70,7 @@ function onClick(index) {
     let scale = scales[index]
     let idxs = layout.settings.scaleSideIdxs
     idxs[S] = index
+    
     events.emitSpec('hub', 'set-scale-index', {
         paneId: id,
         index: index,

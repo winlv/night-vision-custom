@@ -143,15 +143,18 @@ keydown(event) {
 }
 
 keyup(event) {
-    if (event.key === 'Shift') {
-        shift = false
-    }
+    shift = false
 }
 
 mouseout(event) {
     if (event.which === 2) {
         shift = false
     }
+}
+
+mouseup(event) {
+    shift = false;
+    $events.emit('drawing-mode-off');
 }
 
 mousedown(event) {

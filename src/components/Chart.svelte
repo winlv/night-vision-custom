@@ -1,23 +1,17 @@
 <script>
 
-// Main component combining all grids, scales, etc.
-// Also, main event router, root of 'update' events
-
 import { onMount, onDestroy } from 'svelte'
 import Cursor from '../core/cursor.js'
 import DataHub from '../core/dataHub.js'
 import MetaHub from '../core/metaHub.js'
 import Scan from '../core/dataScanner.js'
 import Events from '../core/events.js'
-import Const from '../stuff/constants.js'
 import Utils from '../stuff/utils.js'
 import Layout from '../core/layout.js'
 import Context from '../stuff/context.js'
 import Pane from './Pane.svelte'
 import Botbar from './Botbar.svelte'
 import NoDataStub from './NoDataStub.svelte'
-import Toolbar from "./Toolbar.svelte";
-import Heatmap from "../core/primitives/heatmap.js";
 
 export let props = {}
 
@@ -188,8 +182,6 @@ function rangeUpdate($range) {
 {#key chartRR} <!-- Full chart re-render -->
 <div class="nvjs-chart" >
     {#if layout && layout.main}
-        <Toolbar {props} {layout} side='left'/>
-
         {#each hub.panes() as pane, i}
     	<Pane id={i}
             layout={layout.grids[i]}

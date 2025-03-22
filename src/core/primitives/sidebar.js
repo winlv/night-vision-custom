@@ -16,6 +16,7 @@ function body(props, layout, scale, side, ctx) {
     ctx.fillStyle = props.colors.text
     ctx.beginPath()
 
+
     for (var p of points) {
 
         if (p[0] > layout.height) continue

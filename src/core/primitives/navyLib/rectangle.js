@@ -8,7 +8,7 @@ export default class Rectangle {
         this.onSelect = () => {
         }
         
-        this.state = 'tracking';
+        this.state = 'settled';
         this.rectangle = new core.lib.RectangleShape(core);
         this.pins = [
             new core.lib.Pin(core, this, 'p1'),
@@ -18,17 +18,24 @@ export default class Rectangle {
         ]
         if (nw) {
             this.pins[1].state = 'tracking';
+            this.state = 'tracking';
         }
     }
 
     draw(ctx) {
         this.rectangle.update(this.data.p1, this.data.p2)
         ctx.lineWidth = this.data.lineWidth ?? 1;
-        ctx.strokeStyle = this.data.color ?? '#dc9800'
-        ctx.fillStyle = (this.data.color ?? '#dc980010') + '20'
+        ctx.strokeStyle = this.data.color ?? '#dc9800';
+        ctx.fillStyle = (this.data.fillColor ?? '#dc980010') + '20'
         
         ctx.beginPath()
         this.rectangle.draw(ctx);
+        if (this.data.lineType === 'dashed') {
+            ctx.setLineDash([8])
+        }
+        if (this.data.lineType === 'dotted') {
+            ctx.setLineDash([2])
+        }
         ctx.stroke();
         ctx.fill();
         ctx.closePath();
@@ -65,7 +72,7 @@ export default class Rectangle {
     }
 
     mouseup(event) {
-        this.state = 'settled';
+        this.state = this.pins.some(pin => pin.state === 'tracking') ? 'tracking' : 'settled';
         this.propagate('mouseup', event)
         this.drag.t = null;
         this.drag.v = null;
@@ -81,7 +88,7 @@ export default class Rectangle {
                 return;
             }
 
-            if (this.pins.some(pin => pin.state === 'dragging')) {
+            if (this.pins.some(pin => pin.state === 'tracking')) {
                 return void 0;
             }
     

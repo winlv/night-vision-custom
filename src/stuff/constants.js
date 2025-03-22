@@ -57,7 +57,7 @@ const ChartConfig = {
     RIGHT_OFFSET: 100,
     SBMIN: 60,       // Minimal sidebar, px
     SBMAX: Infinity, // Max sidebar, px
-    TOOLBAR: 57,     // Toolbar width, px
+    TOOLBAR: 0,     // Toolbar width, px
     TB_ICON: 25,     // Toolbar icon size, px
     TB_ITEM_M: 6,    // Toolbar item margin, px
     TB_ICON_BRI: 1,  // Toolbar icon brightness

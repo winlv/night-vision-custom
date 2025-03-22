@@ -28,6 +28,7 @@ prop('pins', {type: 'array', def: undefined});
 prop('color', {type: 'string', def: '#dc9800'});
 prop('lineWidth', {type: 'string', def: 2});
 prop('lineStyle', {type: 'string', def: 0});
+prop('lineType', {type: 'string', def: 'solid'});
 prop('initYPos', {type: 'number', def: undefined});
 
 function init(ctx) {
@@ -67,7 +68,12 @@ function draw(ctx) {
         ctx.fillStyle = color;
 
         ctx.beginPath();
-        ctx.setLineDash([$props.lineStyle, $props.lineStyle]);
+        if ($props.lineType === 'dashed') {
+            ctx.setLineDash([8])
+        }
+        if ($props.lineType === 'dotted') {
+            ctx.setLineDash([2])
+        }
         ctx.lineWidth = $props.lineWidth;
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);

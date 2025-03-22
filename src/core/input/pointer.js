@@ -352,10 +352,10 @@ export default class Input {
 
         if (this.trackpad) delta *= 0.032;
 
+        
         delta = Utils.smartWheel(delta);
 
         const dpr = window.devicePixelRatio ?? 1;
-
         // TODO: mouse zooming is a little jerky,
         // needs to follow f(mouse_wheel_speed) and
         // if speed is low, scroll shoud be slower
@@ -364,6 +364,7 @@ export default class Input {
         if (delta > 0 && data.length > this.MAX_ZOOM) return;
         let k = this.interval / 1000;
         let diff = delta * k * data.length;
+        
         let tl = this.props.config.ZOOM_MODE === "tl";
         if (event.originalEvent.ctrlKey || tl) {
             let offset = event.originalEvent.offsetX;
@@ -455,7 +456,7 @@ export default class Input {
         this.changeRange();
     }
 
-    trackpadScroll(event) {
+    trackpadScroll(event) {        
         if (this.meta.scrollLock) return;
 
         let dt = this.range[1] - this.range[0];

@@ -35,7 +35,7 @@ export default class Heatmap {
 
         this.heatmapApp.view.style.position = 'absolute';
         this.heatmapApp.view.style.top = 0;
-        this.heatmapApp.view.style.left = '57px';
+        this.heatmapApp.view.style.left = 0;
         this.heatmapApp.view.style.pointerEvents = 'none';
         this.heatmapApp.view.classList.add('orderbook-heatmap');
 

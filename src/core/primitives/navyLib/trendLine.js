@@ -32,6 +32,12 @@ export default class TrendLine {
         ctx.strokeStyle = this.data.color ?? '#dc9800'
         ctx.beginPath()
         this.line.draw(ctx);
+        if (this.data.lineType === 'dashed') {
+            ctx.setLineDash([8])
+        }
+        if (this.data.lineType === 'dotted') {
+            ctx.setLineDash([2])
+        }
         ctx.stroke();
         ctx.closePath();
 

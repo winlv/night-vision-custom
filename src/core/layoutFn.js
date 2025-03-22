@@ -66,8 +66,8 @@ export default function (self, range, overlay = null) {
         },
         // Screen-X to timestamp
         x2time: x => {
-            // return Math.floor(range[0] + x / r)
-            return range[0] + x / r
+            return Math.floor(range[0] + x / r);
+            // return range[0] + x / r
         },
         // Screen-X to time-index
         x2ti: x => {

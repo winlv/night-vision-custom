@@ -38,6 +38,7 @@ export default class Grid extends Layer {
         ctx.strokeStyle = this.props.colors.grid
         ctx.beginPath()
 
+
         const ymax = layout.height
         for (var [x, p] of layout.xs) {
 

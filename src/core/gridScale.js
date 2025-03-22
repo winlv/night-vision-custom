@@ -78,6 +78,9 @@ export default function Scale(id, src, specs) {
         for (var ov of ovs) {
             if (ov.settings.display === false) continue
             let yfn = (meta.yRangeFns[gridId] || [])[ov.id]
+            if (!prefabs[ov.type]) {
+                break;
+            }
             let yfnStatic = prefabs[ov.type].static.yRange 
             if (yfnStatic) {
                 yfn = { 

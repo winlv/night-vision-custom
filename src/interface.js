@@ -255,7 +255,9 @@ class NightVision {
 
     // Should call this to clean-up memory / events
     destroy() {
-        this.comp.$destroy()
+        console.log('chart destroy');
+        this.comp.$destroy();
+        this.ww.stop();
     }
 }
 

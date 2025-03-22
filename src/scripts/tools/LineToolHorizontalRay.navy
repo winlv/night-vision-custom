@@ -4,6 +4,8 @@
 [OVERLAY name = LineToolHorizontalRay, ctx = Canvas, verion = 1.0.0]
 
 prop('color', { type: 'Color', def: '#b98200' })
+prop('lineType', {type: 'string', def: 'solid'});
+prop('lineWidth', {type: 'number', def: 1});
 
 let timeId = null
 let mouseX = 0
@@ -64,13 +66,13 @@ newLine()
         p1: [t, $],
         uuid: uuid,
         lineWidth: $props.lineWidth,
+        lineType: $props.lineType,
         color: $props.color
     }
     $core.dataExt.lines.push(line)
     lines[uuid] = new $lib.TrendLine($core, line, true)
     lines[uuid].onSelect = lineSelected
     lines[uuid].selected = true
-
 
     $events.emit('update-layout')
 }
@@ -85,7 +87,7 @@ lineSelected($uuid)
         const selected = uuid === $uuid;
         lines[uuid].selected = selected;
         if (selected) {
-            $events.emit('object-selected', {id: uuid, type: 'LineToolHorizontalRay'});
+            setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'LineToolHorizontalRay'}));
         }
     }
     $events.emit('update-layout')
@@ -145,8 +147,10 @@ mouseup(event)
 {
     clearTimeout(timeId)
     timeId = null
-    propagate('mouseup', event)
-    $events.emit('drawing-mode-off');
+    propagate('mouseup', event);
+    if ($core.meta.tool === 'LineToolHorizontalRay') {
+        $events.emit('drawing-mode-off');
+    }
 
     let s = Object.values(lines).find(x => x.selected);
     if (s) {

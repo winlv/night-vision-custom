@@ -199,11 +199,13 @@ export default {
 
     // Limit crazy wheel delta values
     smartWheel(delta) {
-        let abs = Math.abs(delta)
-        if (abs > 500) {
-            return (200 + Math.log(abs)) * Math.sign(delta)
+        let abs = Math.abs(delta);
+
+        if (abs < 10) {
+            return 0;
         }
-        return delta * 3
+
+        return (200 + Math.log(abs)) * Math.sign(delta);
     },
 
     // Parse the original mouse event to find deltaX

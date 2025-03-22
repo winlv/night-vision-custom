@@ -36,7 +36,8 @@ export default class Cursor {
         }
 
         // Quantize x-coordinate
-        this.x = Math.round((this.x - start) / step) * step + start
+        // this.x = Math.round((this.x - start) / step) * step + start
+
 
         // Precision
         this.x = Math.floor(this.x - 1) + 0.5
