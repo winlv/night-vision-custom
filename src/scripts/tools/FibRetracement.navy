@@ -1,0 +1,145 @@
+import FibRetracement from "../../core/primitives/navyLib/fibRetracement.js";
+
+[OVERLAY name = FibRetracement, ctx = Canvas, version = 1.0.0, author = Dmitry]
+
+prop('lineWidth', {type: 'number', def: 1});
+
+let mouseX = 0;
+let lines = {}
+
+function init() {
+    $core.dataExt.lines = $core.data;
+
+    for (const line of $core.dataExt.lines || []) {
+        lines[line.uuid] = new $lib.FibRetracement($core, line);
+        lines[line.uuid].onSelect = toolSelected;
+    }
+}
+
+function draw(ctx) {
+    if (!$core.dataExt.lines?.length && lines) {
+        Object.values(lines).forEach(x => removeTool(x.data.uuid))
+    }
+
+    for (const line of Object.values(lines)) {
+        line.draw(ctx)
+    }
+}
+
+function mousedown(event) {
+    if (unfinishedTools()) {
+        $events.emit('update-layout');
+        propagate('mousedown', event);
+        $events.emit('drawing-mode-off');
+        return void 0;
+    }
+
+    if ($core.meta.tool !== 'FibRetracement') {
+        toolSelected(null);
+        $events.emit('update-layout');
+        propagate('mousedown', event);
+        return void 0;
+    }
+
+    mouseX = $core.mouse.x;
+    toolSelected(null);
+    $events.emit('update-layout');
+    propagate('mousedown', event);
+    newTool();
+}
+
+function mouseup(event) {
+    propagate('mouseup', event);
+
+    let s = Object.values(lines).find(x => x.selected);
+    if (s) {
+        $events.emit('change-tool-data', {
+            data: $core.dataExt.lines,
+            id: $core.id
+        });
+    }
+
+    $events.emit('scroll-lock', false);
+}
+
+function mousemove(event) {
+    propagate('mousemove', event);
+}
+
+function keydown(event) {
+    if (event.code === 'Backspace' || event.code === 'Delete') {
+        let s = Object.values(lines).find(x => x.selected)
+        if (s) removeTool(s.data.uuid)
+    }
+}
+
+function propagate(name, data) {
+    for (const rectangle of Object.values(lines)) {
+        rectangle[name](data)
+    }
+}
+
+function newTool() {
+    if (!$core.dataExt.lines) {
+        $core.dataExt.lines = []
+    }
+
+    const yView = $core.layout.$hi - $core.layout.$lo
+
+    let time = $core.layout.x2time($core.cursor.x);
+    let yValue = $core.layout.y2value($core.cursor.y);
+    let uuid = $lib.Utils.uuid3();
+
+    let tool = {
+        p1: [time, yValue],
+        p2: [time, yValue],
+
+        lineWidth: $props.lineWidth,
+        uuid: uuid
+    };
+
+    $core.dataExt.lines.push(tool);
+
+    lines[uuid] = new $lib.FibRetracement($core, tool, true);
+    lines[uuid].onSelect = toolSelected;
+    lines[uuid].selected = true;
+    lines[uuid].state = 'dragging';
+}
+
+function toolSelected($uuid) {
+    if (!$uuid) {
+        $events.emit('object-selected', {id: undefined, type: undefined});
+    }
+
+    for (const uuid in lines) {
+        const selected = uuid === $uuid;
+        lines[uuid].selected = selected;
+        if (selected) {
+            setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'FibRetracement'}));
+        }
+    }
+
+    $events.emit('update-layout')
+}
+
+function unfinishedTools() {
+    for (const line of Object.values(lines)) {
+        if (line.state === 'tracking') {
+            return true
+        }
+    }
+    return false
+}
+
+function removeTool(uuid) {
+    delete lines[uuid]
+    $core.dataExt.lines = $core.dataExt.lines?.filter(x => x.uuid !== uuid) ?? [];
+    $events.emit('update-layout')
+
+    $events.emit('change-tool-data', {
+        data: $core.dataExt.lines,
+        id: $core.id
+    });
+
+    $events.emit('object-selected', {id: undefined, type: undefined});
+}

@@ -105,6 +105,31 @@ class MetaHub {
         this.selectedTool = id;
     }
 
+    removeTool = (uuid) => {
+        for (const drawingOverlay of this.hub.data.panes[0].overlays) {
+            if (drawingOverlay.drawingTool) {
+                const drawingToolIdx = drawingOverlay.data.findIndex(d => d.uuid === uuid);
+                if (drawingToolIdx !== -1) {
+                    drawingOverlay.data = drawingOverlay.data.slice(drawingToolIdx, 1);
+                    if (drawingOverlay.dataExt?.rectangles) {
+                        drawingOverlay.dataExt.rectangles = drawingOverlay.dataExt.rectangles?.slice(drawingToolIdx, 1);
+                    }
+                    if (drawingOverlay.dataExt?.lines) {
+                        drawingOverlay.dataExt.lines = drawingOverlay.dataExt.lines?.slice(drawingToolIdx, 1);
+                    }
+                    if (drawingOverlay.dataExt?.brushes) {
+                        drawingOverlay.dataExt.brushes = drawingOverlay.dataExt.brushes?.slice(drawingToolIdx, 1);
+                    }
+                }
+            }
+        }
+
+        this.drawingModeOff();
+        this.events.emit('object-selected', {id: undefined});
+        this.events.emitSpec('chart', 'update-layout');
+        this.events.emit('commit-tool-changes');
+    }
+
     removeAllTools = () => {
         for (const drawingOverlay of this.hub.data.panes[0].overlays) {
             if (drawingOverlay.drawingTool) {

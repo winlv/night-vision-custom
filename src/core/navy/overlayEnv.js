@@ -28,9 +28,13 @@ import Pin from '../primitives/navyLib/pin.js'
 import Rectangle from '../primitives/navyLib/rectangle.js'
 import RectangleShape from '../primitives/navyLib/rectangleShape.js'
 import RectanglePin from '../primitives/navyLib/rectanglePin.js'
+import ShortLongPosition from "../primitives/navyLib/shortLongPosition.js";
 import {candleColor, fastSma, rescaleFont} from '../primitives/navyLib/helperFns.js'
 import Ray from "../primitives/navyLib/ray.js";
 import candleBodyTransparent from "../primitives/navyLib/candleBodyTransparent.js";
+import ShortLongPositionShape from "../primitives/navyLib/shortLongPositionShape.js";
+import FibRetracement from "../primitives/navyLib/fibRetracement.js";
+import FibRetracementShape from "../primitives/navyLib/fibRetracementShape.js";
 
 const formatCash = Utils.formatCash
 
@@ -63,7 +67,8 @@ export default class OverlayEnv {
             candleBody, candleBodyTransparent, candleWick, volumeBar,
             fastSma, avgVolume, candleColor,
             roundRect, rescaleFont, drawArrow,
-            TrendLine, Segment, Pin, Ray, Brush, Curve, Rectangle, RectangleShape, RectanglePin,
+            TrendLine, Segment, Pin, Ray, Brush, Curve, Rectangle, RectangleShape, RectanglePin, ShortLongPosition, ShortLongPositionShape,
+            FibRetracement, FibRetracementShape,
             Utils
         }
 

@@ -96,16 +96,14 @@ deltaValue() {
 
 // Delta time in bars
 bars() {
-    let data = $core.hub.mainOv.dataSubset
-    if (pin1 && pin2) {
-        const layout = $core.layout
-        const bars = data.filter(bar => {
-            return bar[0] >= Math.min(pin1.t, pin2.t) && bar[0] <= Math.max(pin1.t, pin2.t)
-        });
-        let count = bars.length - 1; // reduce the count by 1
-        return pin2.t < pin1.t ? -count : count; // make it negative if pin2.t < pin1.t
-    }
-    return 0
+    let data = $core.hub.mainOv.dataSubset || [];
+    if (!data.length || !pin1 || !pin2) return 0;
+
+    const bars = data.filter(bar => {
+        return bar[0] >= Math.min(pin1.t, pin2.t) && bar[0] <= Math.max(pin1.t, pin2.t);
+    });
+    let count = bars.length - 1;
+    return pin2.t < pin1.t ? -count : count;
 }
 
 // Delta time in text format

@@ -109,8 +109,7 @@ function tracker(props, layout, scale, side, ctx, tracker) {
     let a = S ? 7 : panWidth - 3
     let h = ct ? Math.floor(panHeight * 1.75) + 2 + HPX : panHeight
     roundRect(ctx, x , y, panWidth, h, 3, S)
-    // ctx.fillStyle = props.colors.back
-    ctx.fillStyle = '#fff'
+    ctx.fillStyle = isColorDark(tracker.color) ? '#ffffff' : '#000000';
     ctx.textAlign = S ? 'left' : 'right'
     ctx.fillText(lbl, a, y + panHeight - 4) // TODO: remove hardcode
     if (ct) {
@@ -118,7 +117,22 @@ function tracker(props, layout, scale, side, ctx, tracker) {
         ctx.textAlign = S ? 'left' : 'right'
         ctx.fillText(rt, a, y + panHeight + 9) // TODO: remove hardcode
     }
+}
 
+function isColorDark(hex) {
+    hex = hex.replace('#', '');
+
+    if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+    }
+
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    const brightness = (0.299 * r + 0.587 * g + 0.114 * b);
+
+    return brightness < 128; // Threshold for dark/light
 }
 
 function roundRect(ctx, x, y, w, h, r, s) {

@@ -128,6 +128,7 @@ function newBrush() {
     let brush = {
         points: [{x: time, y: yValue}],
         lineWidth: $props.lineWidth,
+        lineType: $props.lineType,
         color: $props.color,
         uuid: uuid
     };

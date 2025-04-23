@@ -19,6 +19,14 @@ export default class Brush {
         ctx.lineWidth = this.data.lineWidth ?? 1;
         ctx.strokeStyle = this.data.color ?? '#dc9800';
         this.curve.draw(ctx);
+        console.log(this.data.lineType);
+        ctx.setLineDash([0])
+        if (this.data.lineType === 'dashed') {
+            ctx.setLineDash([8])
+        }
+        if (this.data.lineType === 'dotted') {
+            ctx.setLineDash([3])
+        }
         ctx.stroke();
         ctx.closePath();
 
@@ -43,6 +51,7 @@ export default class Brush {
             this.y = this.core.layout.value2y(y),
             r + 0.5, 0, Math.PI * 2, true)
         ctx.fill()
+        ctx.setLineDash([0])
         ctx.stroke()
     }
 

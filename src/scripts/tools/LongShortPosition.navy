@@ -1,0 +1,152 @@
+// Navy ~ 0.2-lite
+// <ds>Time & value measurment tool [Shift+Click]</ds>
+
+[OVERLAY name=LongShortPosition, ctx=Canvas, verion=1.0.1]
+
+let mouseX = 0;
+let rectangles = {}
+
+function init() {
+    $core.dataExt.rectangles = $core.data;
+
+    for (const rectangle of $core.dataExt.rectangles || []) {
+        rectangles[rectangle.uuid] = new $lib.ShortLongPosition($core, rectangle);
+        rectangles[rectangle.uuid].onSelect = toolSelected;
+    }
+}
+
+function draw(ctx) {
+    if (!$core.dataExt.rectangles?.length && rectangles) {
+        Object.values(rectangles).forEach(x => removeTool(x.data.uuid))
+    }
+
+    for (const rectangle of Object.values(rectangles)) {
+        rectangle.draw(ctx)
+    }
+}
+
+function mousedown(event) {
+    if (unfinishedTools()) {
+       $events.emit('update-layout');
+       propagate('mousedown', event);
+       $events.emit('drawing-mode-off');
+       return void 0;
+    }
+
+    if ($core.meta.tool !== 'LongShortPosition') {
+       toolSelected(null);
+       $events.emit('update-layout');
+       propagate('mousedown', event);
+       return void 0;
+    }
+
+    mouseX = $core.mouse.x;
+    toolSelected(null);
+    $events.emit('update-layout');
+    propagate('mousedown', event);
+    newLongShortPosition();
+}
+
+function mouseup(event) {
+    propagate('mouseup', event);
+
+    let s = Object.values(rectangles).find(x => x.selected);
+    if (s) {
+        $events.emit('change-tool-data', {
+            data: $core.dataExt.rectangles,
+            id: $core.id
+        });
+    }
+
+    $events.emit('scroll-lock', false);
+}
+
+function mousemove(event) {
+    propagate('mousemove', event);
+}
+
+function keydown(event) {
+    if (event.code === 'Backspace' || event.code === 'Delete') {
+        let s = Object.values(rectangles).find(x => x.selected)
+        if (s) removeTool(s.data.uuid)
+    }
+}
+
+function propagate(name, data) {
+    for (const rectangle of Object.values(rectangles)) {
+        rectangle[name](data)
+    }
+}
+
+function newLongShortPosition() {
+    if (!$core.dataExt.rectangles) {
+        $core.dataExt.rectangles = []
+    }
+
+    const yView = $core.layout.$hi - $core.layout.$lo
+
+    let time = $core.layout.x2time($core.cursor.x);
+    let timeEnd = $core.layout.x2time($core.cursor.x + 250);
+    let yValue = $core.layout.y2value($core.cursor.y);
+    let yValueUp = yValue + yView / 6;
+    let yValueBottom = yValue - yView / 6;
+    let uuid = $lib.Utils.uuid3();
+
+    let longShortPosition = {
+        upSizePin: [time, yValueUp],
+        commonSizePin: [time, yValue],
+        bottomSizePin: [time, yValueBottom],
+        widthSizePin: [timeEnd, yValue],
+
+        lineWidth: $props.lineWidth,
+        color: $props.color,
+        fillColor: $props.fillColor,
+        lineType: $props.lineType,
+        uuid: uuid
+    };
+
+    $core.dataExt.rectangles.push(longShortPosition);
+
+    rectangles[uuid] = new $lib.ShortLongPosition($core, longShortPosition);
+    rectangles[uuid].onSelect = toolSelected;
+    rectangles[uuid].selected = true;
+    rectangles[uuid].state = 'dragging';
+}
+
+function toolSelected($uuid) {
+    if (!$uuid) {
+        $events.emit('object-selected', {id: undefined, type: undefined});
+    }
+
+    for (const uuid in rectangles) {
+        const selected = uuid === $uuid;
+        rectangles[uuid].selected = selected;
+        if (selected) {
+            setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'LongShortPosition'}));
+        }
+    }
+
+    $events.emit('update-layout')
+}
+
+function unfinishedTools() {
+    for (const rectangle of Object.values(rectangles)) {
+        if (rectangle.state === 'tracking') {
+            return true
+        }
+    }
+    return false
+}
+
+function removeTool(uuid) {
+    delete rectangles[uuid]
+    $core.dataExt.rectangles = $core.dataExt.rectangles?.filter(x => x.uuid !== uuid) ?? [];
+    $events.emit('update-layout')
+
+    $events.emit('change-tool-data', {
+        data: $core.dataExt.rectangles,
+        id: $core.id
+    });
+
+    $events.emit('object-selected', {id: undefined, type: undefined});
+}

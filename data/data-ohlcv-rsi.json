@@ -33685,6 +33685,39 @@
           "settings": {
             "zIndex": 1000
           }
+        },
+        {
+          "name": "ShortLongPosition",
+          "type": "ShortLongPosition",
+          "drawingTool": true,
+          "data": [],
+          "props": {},
+          "settings": {
+            "zIndex": 1000
+          }
+        },
+        {
+          "name": "LongShortPosition",
+          "type": "LongShortPosition",
+          "drawingTool": true,
+          "data": [],
+          "props": {
+
+          },
+          "settings": {
+            "zIndex": 1000
+          }
+        },
+        {
+          "name": "FibRetracement",
+          "type": "FibRetracement",
+          "drawingTool": true,
+          "data": [],
+          "props": {
+          },
+          "settings": {
+            "zIndex": 1000
+          }
         }
       ]
     }
