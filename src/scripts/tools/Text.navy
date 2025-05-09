@@ -1,0 +1,220 @@
+[OVERLAY name = Text, ctx = Canvas, version = 1.0.0, author = Dmitry]
+
+prop('textColor', {type: 'string', def: '#fff'});
+prop('textWidth', {type: 'string', def: 'bold'});
+prop('textSize', {type: 'number', def: 18});
+prop('background', {type: 'string', def: 'transparent'});
+
+let mouseX = 0;
+let rectangles = {}
+
+function init() {
+    $core.dataExt.rectangles = $core.data;
+
+    for (const rectangle of $core.dataExt.rectangles || []) {
+        rectangles[rectangle.uuid] = new $lib.Text($core, rectangle);
+        rectangles[rectangle.uuid].onSelect = toolSelected;
+    }
+}
+
+function draw(ctx) {
+    if (!$core.dataExt.rectangles?.length && rectangles) {
+        Object.values(rectangles).forEach(x => removeTool(x.data.uuid))
+    }
+
+    for (const rectangle of Object.values(rectangles)) {
+        rectangle.draw(ctx)
+    }
+}
+
+function mousedown(event) {
+    if (unfinishedTools()) {
+        $events.emit('update-layout');
+        propagate('mousedown', event);
+        $events.emit('drawing-mode-off');
+        return void 0;
+    }
+
+    if ($core.meta.tool !== 'Text') {
+        toolSelected(null);
+        $events.emit('update-layout');
+        propagate('mousedown', event);
+        return void 0;
+    }
+
+    mouseX = $core.mouse.x;
+    toolSelected(null);
+    $events.emit('update-layout');
+    propagate('mousedown', event);
+    newTool();
+}
+
+function mouseup(event) {
+    propagate('mouseup', event);
+
+    let s = Object.values(rectangles).find(x => x.selected);
+    if (s) {
+        $events.emit('change-tool-data', {
+            data: $core.dataExt.rectangles,
+            id: $core.id
+        });
+    }
+
+    $events.emit('scroll-lock', false);
+}
+
+function mousemove(event) {
+    propagate('mousemove', event);
+}
+
+function adjustTextareaSize(textarea) {
+    const text = textarea.value;
+
+    const tempSpan = document.createElement('span');
+    tempSpan.style.visibility = 'hidden';
+    tempSpan.style.whiteSpace = 'pre-wrap';
+    tempSpan.style.display = 'block';
+    tempSpan.style.font = textarea.style.font;
+    tempSpan.textContent = text;
+
+    document.body.appendChild(tempSpan);
+    const width = tempSpan.offsetWidth + 5;
+    const height = tempSpan.offsetHeight + 5;
+    document.body.removeChild(tempSpan);
+
+    textarea.style.width = `${width}px`;
+    textarea.style.height = `${height}px`;
+    textarea.style.minHeight = `26px`;
+}
+
+function startTextEdit(textTool) {
+    const textarea = document.getElementById('canvas-drawing-tool-textarea');
+    const layout = $core.layout;
+
+    const x = layout.time2x(textTool.data.x);
+    const y = layout.value2y(textTool.data.y);
+
+    textarea.style.left = `${x}px`;
+    textarea.style.top = `${y - 3}px`;
+    textarea.style.display = 'block';
+    textarea.style.fontSize = $props.textSize + 'px';
+    textarea.style.fontFamily = "Roboto, sans-serif";
+    textarea.style.color = $props.textColor;
+    const value = textTool.data.predictedText ?? (textTool.data.text || '');
+    textarea.value = value;
+    textarea.focus();
+
+    textarea.onkeydown = event => {
+        if (event.code === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }
+
+    textarea.oninput = (event) => {
+        adjustTextareaSize(textarea);
+        textTool.data.predictedText = textarea.value;
+        $events.emit('update-layout');
+    };
+
+    textarea.onblur = () => {
+        textTool.data.text = textarea.value;
+        textarea.style.display = 'none';
+        $events.emit('update-layout');
+    };
+}
+
+function keydown(event) {
+    let selected = Object.values(rectangles).find(x => x.selected);
+
+    // if (event.code === 'Backspace' || event.code === 'Delete') {
+    //     if (s) removeTool(s.data.uuid)
+    //     return void 0;
+    // }
+
+    if (selected?.typing) {
+        startTextEdit(selected);
+    }
+}
+
+function propagate(name, data) {
+    for (const rectangle of Object.values(rectangles)) {
+        rectangle[name](data)
+    }
+}
+
+function newTool() {
+    if (!$core.dataExt.rectangles) {
+        $core.dataExt.rectangles = []
+    }
+
+    let time = $core.layout.x2time($core.cursor.x);
+    let yValue = $core.layout.y2value($core.cursor.y);
+    let uuid = $lib.Utils.uuid3();
+
+    let tool = {
+        x: time,
+        y: yValue,
+        text: "",
+        predictedText: "",
+
+        textColor: $props.textColor,
+        textWidth: $props.textWidth,
+        textSize: $props.textSize,
+        background: $props.background,
+        uuid: uuid
+    };
+
+    $core.dataExt.rectangles.push(tool);
+
+    rectangles[uuid] = new $lib.Text($core, tool, true);
+    rectangles[uuid].onSelect = toolSelected;
+    rectangles[uuid].selected = true;
+    rectangles[uuid].typing = true;
+}
+
+function toolSelected($uuid) {
+    if (!$uuid) {
+        $events.emit('object-selected', {id: undefined, type: undefined});
+    }
+
+    for (const uuid in rectangles) {
+        const selected = uuid === $uuid;
+        if (!selected && rectangles[uuid].data.collision()) {
+        } else {
+            rectangles[uuid].selected = selected;
+        }
+        if (selected) {
+            setTimeout(() => {
+                $events.emit('object-selected', {id: uuid, type: 'Text'});
+                if (rectangles[uuid].typing) {
+                    startTextEdit(rectangles[uuid]);
+                }
+            });
+        }
+    }
+
+    $events.emit('update-layout')
+}
+
+function unfinishedTools() {
+    for (const rectangle of Object.values(rectangles)) {
+        if (rectangle.state === 'tracking') {
+            return true
+        }
+    }
+    return false
+}
+
+function removeTool(uuid) {
+    delete rectangles[uuid]
+    $core.dataExt.rectangles = $core.dataExt.rectangles?.filter(x => x.uuid !== uuid) ?? [];
+    $events.emit('update-layout')
+
+    $events.emit('change-tool-data', {
+        data: $core.dataExt.rectangles,
+        id: $core.id
+    });
+
+    $events.emit('object-selected', {id: undefined, type: undefined});
+}

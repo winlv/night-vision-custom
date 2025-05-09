@@ -27,10 +27,11 @@ export default class TrendLine {
     }
 
     draw(ctx) {
-        this.line.update(this.data.p1, this.data.p2)
+        const color = this.data.color ?? '#dc9800';
+        this.line.update(this.data.p1, this.data.p2);
         ctx.lineWidth = this.data.lineWidth ?? 1;
-        ctx.strokeStyle = this.data.color ?? '#dc9800'
-        ctx.beginPath()
+        ctx.strokeStyle = this.data.color ?? '#dc9800';
+        ctx.beginPath();
         this.line.draw(ctx);
         if (this.data.lineType === 'dashed') {
             ctx.setLineDash([8])
@@ -41,9 +42,11 @@ export default class TrendLine {
         ctx.stroke();
         ctx.closePath();
 
+        ctx.beginPath();
+        ctx.setLineDash([0]);
         if (this.hover || this.selected) {
             for (var pin of this.pins) {
-                pin.draw(ctx)
+                pin.draw(ctx, color)
             }
         }
     }

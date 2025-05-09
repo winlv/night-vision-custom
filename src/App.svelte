@@ -183,8 +183,16 @@
             <li on:click={() => onClick('ShortLongPosition')}>shortlong</li>
             <li on:click={() => onClick('LongShortPosition')}>longshort</li>
             <li on:click={() => onClick('FibRetracement')}>fibRetracement</li>
+            <li on:click={() => onClick('Text')}>Text</li>
             <li>magnet</li>
         </ul>
     </div>
-    <div id="chart-container"></div>
+    <span style="margin-top: 100px;">
+        test
+        test
+        test
+    </span>
+    <div id="chart-container">
+        <textarea id="canvas-drawing-tool-textarea" style="white-space: nowrap; position: absolute; z-index: 10; font: 14px sans-serif; display: none; resize: none; padding: 0; margin: 0; border: none; background: transparent; outline: none; color: white;"></textarea>
+    </div>
 </div>

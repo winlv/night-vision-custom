@@ -4,7 +4,7 @@ export default class Pin {
 
     constructor(core, line, name, params = {}) {
 
-        this.RADIUS = core.props.config.PIN_RADIUS 
+        this.RADIUS = core.props.config.PIN_RADIUS
         this.RADIUS_SQ = Math.pow(this.RADIUS + 7, 2)
 
         if (core.lib.Utils.isMobile) {
@@ -21,6 +21,7 @@ export default class Pin {
         this.name = name
         this.state = params.state || 'settled';
         this.hidden = params.hidden || false
+        this.cursor = params.cursor;
         this.mouse = this.core.mouse
 
         this.init()
@@ -36,21 +37,21 @@ export default class Pin {
         }
     }
 
-    draw(ctx) {
+    draw(ctx, circleColor = this.COLOR_BR) {
         if (this.hidden) return
         switch (this.state) {
             case 'tracking':
                 break
             case 'dragging':
-                if (!this.moved) this.draw_circle(ctx)
+                if (!this.moved) this.draw_circle(ctx, circleColor)
                 break
             case 'settled':
-                this.draw_circle(ctx)
+                this.draw_circle(ctx, circleColor)
                 break
         }
     }
 
-    draw_circle(ctx) {
+    draw_circle(ctx, circleColor) {
         if (this.line.selected) {
             var r = this.RADIUS, lw = 1.5
         } else {
@@ -62,7 +63,7 @@ export default class Pin {
         this.y$ = p[1]
 
         ctx.lineWidth = lw
-        ctx.strokeStyle = this.COLOR_BR
+        ctx.strokeStyle = circleColor
         ctx.fillStyle = this.COLOR_BACK
         ctx.beginPath()
         ctx.arc(
@@ -93,7 +94,6 @@ export default class Pin {
     }
 
     mousemove(event) {
-
         switch (this.state) {
             case 'tracking':
             case 'dragging':
@@ -101,8 +101,6 @@ export default class Pin {
                 this.update()
                 break
         }
-
-
     }
 
     mousedown(event, force = false) {

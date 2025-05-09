@@ -103,6 +103,13 @@ class MetaHub {
 
     objectSelected = ({id}) => {
         this.selectedTool = id;
+
+        if (!id) {
+            const allCanvas = this.hub.se.chart.root.querySelectorAll('canvas');
+            for (const canvas of allCanvas) {
+                canvas.style.cursor = 'default';
+            }
+        }
     }
 
     removeTool = (uuid) => {
@@ -124,6 +131,7 @@ class MetaHub {
             }
         }
 
+        console.log(this.hub.data.panes[0].overlays);
         this.drawingModeOff();
         this.events.emit('object-selected', {id: undefined});
         this.events.emitSpec('chart', 'update-layout');

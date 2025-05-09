@@ -24,6 +24,7 @@ import TrendLine from '../primitives/navyLib/trendLine.js'
 import Segment from '../primitives/navyLib/seg.js'
 import Brush from '../primitives/navyLib/brush.js'
 import Curve from '../primitives/navyLib/curve.js'
+import Text from '../primitives/navyLib/Text.js'
 import Pin from '../primitives/navyLib/pin.js'
 import Rectangle from '../primitives/navyLib/rectangle.js'
 import RectangleShape from '../primitives/navyLib/rectangleShape.js'
@@ -68,7 +69,7 @@ export default class OverlayEnv {
             fastSma, avgVolume, candleColor,
             roundRect, rescaleFont, drawArrow,
             TrendLine, Segment, Pin, Ray, Brush, Curve, Rectangle, RectangleShape, RectanglePin, ShortLongPosition, ShortLongPositionShape,
-            FibRetracement, FibRetracementShape,
+            FibRetracement, FibRetracementShape, Text,
             Utils
         }
 

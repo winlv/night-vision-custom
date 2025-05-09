@@ -19,7 +19,6 @@ export default class Brush {
         ctx.lineWidth = this.data.lineWidth ?? 1;
         ctx.strokeStyle = this.data.color ?? '#dc9800';
         this.curve.draw(ctx);
-        console.log(this.data.lineType);
         ctx.setLineDash([0])
         if (this.data.lineType === 'dashed') {
             ctx.setLineDash([8])
@@ -30,6 +29,8 @@ export default class Brush {
         ctx.stroke();
         ctx.closePath();
 
+        ctx.beginPath();
+        ctx.setLineDash([0])
         if (this.hover || this.selected) {
             const pin1Data = this.data.points[0];
             const pin2Data = this.data.points[this.data.points.length - 1];
@@ -41,9 +42,10 @@ export default class Brush {
 
     drawPin(ctx, x, y) {
         const r = 5.5;
+        const lw = this.selected ? 1.5 : 1;
 
-        ctx.lineWidth = 1
-        ctx.strokeStyle = this.core.colors.text
+        ctx.lineWidth = lw;
+        ctx.strokeStyle = this.data.color ?? '#dc9800';
         ctx.fillStyle = this.core.colors.back
         ctx.beginPath()
         ctx.arc(
@@ -92,7 +94,19 @@ export default class Brush {
         this.drag = {t: undefined, v: undefined};
     }
 
+    mouseout(event) {
+        console.log('mouseout');
+    }
+
     mousemove(event) {
+        if (this.collision() && this.state === 'settled') {
+            event.target.style.cursor = 'move';
+        }
+
+        if (!this.collision() && this.hover) {
+            event.target.style.cursor = 'default';
+        }
+
         this.hover = this.collision();
         this.propagate('mousemove', event);
 

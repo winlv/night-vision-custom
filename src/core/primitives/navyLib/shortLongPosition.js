@@ -3,6 +3,7 @@ export default class ShortLongPosition {
         this.core = core;
         this.data = point;
         this.hover = false;
+        this.pinHover = false;
         this.selected = false;
         this.state = 'tracking';
         this.drag = {t: undefined, v: undefined};
@@ -12,9 +13,9 @@ export default class ShortLongPosition {
 
         this.shortLongPosition = new core.lib.ShortLongPositionShape(core, this.opposite);
         this.pins = [
-            new core.lib.Pin(core, this, 'upSizePin'),
+            new core.lib.Pin(core, this, 'upSizePin', {cursor: 'ns-resize'}),
             new core.lib.Pin(core, this, 'commonSizePin'),
-            new core.lib.Pin(core, this, 'bottomSizePin'),
+            new core.lib.Pin(core, this, 'bottomSizePin', {cursor: 'ns-resize'}),
             new core.lib.Pin(core, this, 'widthSizePin'),
         ]
     }
@@ -50,6 +51,24 @@ export default class ShortLongPosition {
     }
 
     mousemove(event) {
+        const pin = this.pins.find(pin => pin.hover() || pin.state === 'tracking');
+        if (pin?.cursor && this.state === 'settled') {
+            event.target.style.cursor = pin.cursor;
+        }
+
+        if (!pin && this.pinHover) {
+            event.target.style.cursor = 'default';
+        }
+
+        if (this.collision() && this.state === 'settled') {
+            event.target.style.cursor = 'move';
+        }
+
+        if (!this.collision() && this.hover) {
+            event.target.style.cursor = 'default';
+        }
+
+        this.pinHover = !!pin;
         this.hover = this.collision();
         this.propagate('mousemove', event);
         this.shortLongPosition.handleHover(this.hover);

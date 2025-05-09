@@ -4,14 +4,15 @@ export default class FibRetracement {
         this.core = core
         this.data = line
         this.hover = false
+        this.pinHover = false;
         this.selected = false
         this.onSelect = () => {
         }
         this.fibRetracement = new core.lib.FibRetracementShape(core);
         this.drag = {t: undefined, v: undefined};
         this.pins = [
-            new core.lib.Pin(core, this, 'p1'),
-            new core.lib.Pin(core, this, 'p2')
+            new core.lib.Pin(core, this, 'p1', {cursor: 'default'}),
+            new core.lib.Pin(core, this, 'p2', {cursor: 'default'})
         ]
         if (nw) {
             this.pins[1].state = 'tracking';
@@ -63,6 +64,24 @@ export default class FibRetracement {
     }
 
     mousemove(event) {
+        const pin = this.pins.find(pin => pin.hover() || pin.state === 'dragging');
+        if (pin?.cursor && this.state === 'settled') {
+            event.target.style.cursor = pin.cursor;
+        }
+
+        if (!pin && this.pinHover) {
+            event.target.style.cursor = 'default';
+        }
+
+        if (this.collision() && this.state === 'settled') {
+            event.target.style.cursor = 'move';
+        }
+
+        if (!this.collision() && this.hover) {
+            event.target.style.cursor = 'default';
+        }
+
+        this.pinHover = !!pin;
         this.hover = this.collision()
         this.propagate('mousemove', event)
 
