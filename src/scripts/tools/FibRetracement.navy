@@ -94,7 +94,6 @@ function newTool() {
         p1: [time, yValue],
         p2: [time, yValue],
 
-        lineWidth: $props.lineWidth,
         uuid: uuid
     };
 

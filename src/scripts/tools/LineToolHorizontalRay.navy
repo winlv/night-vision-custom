@@ -16,7 +16,7 @@ init()
     $core.dataExt.lines = $core.data;
 
     // Restore lines from dataExt
-    for (var line of $core.dataExt.lines || []) {
+    for (const line of $core.dataExt.lines || []) {
         lines[line.uuid] = new $lib.TrendLine($core, line)
         lines[line.uuid].onSelect = lineSelected
     }
@@ -30,7 +30,7 @@ draw(ctx)
 
     const currentPrice = $core.hub?.mainOv?.data?.[$core.hub.mainOv.data.length - 1]?.[4] ?? 0;
 
-    for (var line of Object.values(lines)) {
+    for (const line of Object.values(lines)) {
         line.draw(ctx)
         const lineData = line.line;
 
@@ -83,11 +83,13 @@ lineSelected($uuid)
         $events.emit('object-selected', {id: undefined, type: undefined});
     }
 
-    for (var uuid in lines) {
+    for (const uuid in lines) {
         const selected = uuid === $uuid;
         lines[uuid].selected = selected;
         if (selected) {
-            setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'LineToolHorizontalRay'}));
+            setTimeout(() => {
+                $events.emit('object-selected', {id: uuid, type: 'LineToolHorizontalRay'})
+            });
         }
     }
     $events.emit('update-layout')
@@ -96,7 +98,7 @@ lineSelected($uuid)
 unfinishedLines()
 {
 
-    for (var line of Object.values(lines)) {
+    for (const line of Object.values(lines)) {
         if (line.pins.some(x => x.state !== 'settled')) {
             return true
         }
@@ -126,7 +128,7 @@ removeLine(uuid)
 propagate(name, data)
 {
     // TODO: sort by z-index
-    for (var line of Object.values(lines)) {
+    for (const line of Object.values(lines)) {
         line[name](data)
     }
 }
@@ -154,7 +156,7 @@ mouseup(event)
 
     let s = Object.values(lines).find(x => x.selected);
     if (s) {
-        $events.emit('change-tool-data', {
+                $events.emit('change-tool-data', {
             data: $core.dataExt.lines,
             id: $core.id
         });
@@ -186,7 +188,7 @@ yRange(data, a, low)
         low = initialLow;
         high = initialHigh;
     } else {
-        for (var i = 0; i < len; i++) {
+        for (let i = 0; i < len; i++) {
             let point = updData[i];
             if (!point) {
                 break;

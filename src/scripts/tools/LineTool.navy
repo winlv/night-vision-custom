@@ -17,7 +17,7 @@ init()
     $core.dataExt.lines = $core.data;
 
     // Restore lines from dataExt
-    for (var line of $core.dataExt.lines || []) {
+    for (const line of $core.dataExt.lines || []) {
         lines[line.uuid] = new $lib.TrendLine($core, line)
         lines[line.uuid].onSelect = lineSelected
     }
@@ -29,7 +29,7 @@ draw(ctx)
         Object.values(lines).forEach(x => removeLine(x.data.uuid))
     }
 
-    for (var line of Object.values(lines)) {
+    for (const line of Object.values(lines)) {
         line.draw(ctx)
     }
 }
@@ -76,7 +76,7 @@ lineSelected($uuid)
         $events.emit('object-selected', {id: undefined, type: undefined});
     }
 
-    for (var uuid in lines) {
+    for (const uuid in lines) {
         const selected = uuid === $uuid;
         lines[uuid].selected = selected;
         if (selected) {
@@ -89,7 +89,7 @@ lineSelected($uuid)
 
 unfinishedLines()
 {
-    for (var line of Object.values(lines)) {
+    for (const line of Object.values(lines)) {
         if (line.pins.some(x => x.state !== 'settled')) {
             return true
         }
@@ -118,7 +118,7 @@ removeLine(uuid)
 
 propagate(name, data)
 {
-    for (var line of Object.values(lines)) {
+    for (const line of Object.values(lines)) {
         line[name](data)
     }
 }
@@ -181,7 +181,7 @@ yRange(data, a, low)
         low = initialLow;
         high = initialHigh;
     } else {
-        for (var i = 0; i < len; i++) {
+        for (let i = 0; i < len; i++) {
             let point = updData[i];
             if (!point) {
                 break;

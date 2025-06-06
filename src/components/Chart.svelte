@@ -80,7 +80,6 @@ onMount(() => {
 })
 
 onDestroy(() => {
-    console.log('destroyHeatmap');
     // Clean-up event listeners on 'chart' component
     meta.destroyHeatmap();
     events.off('chart')

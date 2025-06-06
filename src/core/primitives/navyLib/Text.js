@@ -33,9 +33,11 @@ export default class Text {
 
         if (!this.typing) {
             lines.forEach((line, i) => {
-                const lineY = canvasY + i * lineHeight;
-                ctx.strokeText(line, canvasX, lineY);
-                ctx.fillText(line, canvasX, lineY);
+                if (line) {
+                    const lineY = canvasY + i * lineHeight;
+                    ctx.strokeText(line, canvasX, lineY);
+                    ctx.fillText(line, canvasX, lineY);
+                }
             });
         }
 
@@ -53,6 +55,9 @@ export default class Text {
     }
 
     collision() {
+        if (!this.data?.text) {
+            return false;
+        }
         const mouse = this.core.mouse;
         const { x, y, text } = this.data;
         const layout = this.core.layout;

@@ -88,7 +88,7 @@ function adjustTextareaSize(textarea) {
 }
 
 function startTextEdit(textTool) {
-    const textarea = document.getElementById('canvas-drawing-tool-textarea');
+    const textarea = $core.hub.se.chart.root.querySelector('#canvas-drawing-tool-textarea');
     const layout = $core.layout;
 
     const x = layout.time2x(textTool.data.x);
@@ -105,6 +105,7 @@ function startTextEdit(textTool) {
     textarea.focus();
 
     textarea.onkeydown = event => {
+        event.stopPropagation();
         if (event.code === 'Enter') {
             event.preventDefault();
             event.stopPropagation();
@@ -112,6 +113,7 @@ function startTextEdit(textTool) {
     }
 
     textarea.oninput = (event) => {
+        event.stopPropagation();
         adjustTextareaSize(textarea);
         textTool.data.predictedText = textarea.value;
         $events.emit('update-layout');
@@ -127,10 +129,10 @@ function startTextEdit(textTool) {
 function keydown(event) {
     let selected = Object.values(rectangles).find(x => x.selected);
 
-    // if (event.code === 'Backspace' || event.code === 'Delete') {
-    //     if (s) removeTool(s.data.uuid)
-    //     return void 0;
-    // }
+    if (event.code === 'Backspace' || event.code === 'Delete') {
+        if (selected) removeTool(selected.data.uuid)
+        return void 0;
+    }
 
     if (selected?.typing) {
         startTextEdit(selected);

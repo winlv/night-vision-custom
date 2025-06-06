@@ -1,6 +1,5 @@
 export class Pins {
     constructor() {
-        console.log('Pins');
     }
 
     draw(ctx) {

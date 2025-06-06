@@ -131,7 +131,6 @@ class MetaHub {
             }
         }
 
-        console.log(this.hub.data.panes[0].overlays);
         this.drawingModeOff();
         this.events.emit('object-selected', {id: undefined});
         this.events.emitSpec('chart', 'update-layout');

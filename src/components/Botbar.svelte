@@ -85,7 +85,6 @@
         mc.on("panmove", (event) => {
             zoom = calcZoom(event);
             const range = calcRange(event);
-            console.log(range);
             events.emit("range-changed", range);
             update();
         });

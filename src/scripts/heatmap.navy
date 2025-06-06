@@ -22,7 +22,6 @@ let initialCellWidth = 0;
 
 init() {
     redraw = true;
-    console.log('init');
 }
 
 draw(ctx)
@@ -277,7 +276,6 @@ function drawHeatmap() {
         $core.meta.heatmap.heatmapApp.stage.addChildAt(obj,0);
     }
 
-    console.log($core.meta.heatmap.heatmapApp.stage.children[0].geometry.graphicsData[0].shape.x);
     drawnElements = data.length;
     redraw = false;
     (window.redraw) = false;
