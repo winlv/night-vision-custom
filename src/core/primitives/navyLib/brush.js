@@ -1,3 +1,5 @@
+import {Utils} from "../../../index.js";
+
 export default class Brush {
     constructor(core, point) {
         this.core = core;
@@ -95,15 +97,15 @@ export default class Brush {
     }
 
     mouseout(event) {
-        console.log('mouseout');
+        // console.log('mouseout');
     }
 
     mousemove(event) {
-        if (this.collision() && this.state === 'settled') {
+        if (this.collision() && this.state === 'settled' && !Utils.isMobile) {
             event.target.style.cursor = 'move';
         }
 
-        if (!this.collision() && this.hover) {
+        if (!this.collision() && this.hover && !Utils.isMobile) {
             event.target.style.cursor = 'default';
         }
 

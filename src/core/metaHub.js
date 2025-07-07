@@ -117,15 +117,15 @@ class MetaHub {
             if (drawingOverlay.drawingTool) {
                 const drawingToolIdx = drawingOverlay.data.findIndex(d => d.uuid === uuid);
                 if (drawingToolIdx !== -1) {
-                    drawingOverlay.data = drawingOverlay.data.slice(drawingToolIdx, 1);
+                    drawingOverlay.data.splice(drawingToolIdx, 1);
                     if (drawingOverlay.dataExt?.rectangles) {
-                        drawingOverlay.dataExt.rectangles = drawingOverlay.dataExt.rectangles?.slice(drawingToolIdx, 1);
+                        drawingOverlay.dataExt.rectangles?.splice(drawingToolIdx, 1);
                     }
                     if (drawingOverlay.dataExt?.lines) {
-                        drawingOverlay.dataExt.lines = drawingOverlay.dataExt.lines?.slice(drawingToolIdx, 1);
+                        drawingOverlay.dataExt.lines?.splice(drawingToolIdx, 1);
                     }
                     if (drawingOverlay.dataExt?.brushes) {
-                        drawingOverlay.dataExt.brushes = drawingOverlay.dataExt.brushes?.slice(drawingToolIdx, 1);
+                        drawingOverlay.dataExt.brushes?.splice(drawingToolIdx, 1);
                     }
                 }
             }

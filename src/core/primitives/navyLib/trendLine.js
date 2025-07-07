@@ -68,6 +68,7 @@ export default class TrendLine {
         if (this.collision()) {
             this.onSelect(this.data.uuid)
         }
+        this.hover = false;
     }
 
     mouseup(event) {

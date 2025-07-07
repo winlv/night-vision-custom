@@ -1,3 +1,5 @@
+import {Utils} from "../../../index.js";
+
 export default class Text {
 
     constructor(core, line, nw = false) {
@@ -111,7 +113,7 @@ export default class Text {
     };
 
     mousemove(event) {
-        if (!this.collision() && this.hover) {
+        if (!this.collision() && this.hover && !Utils.isMobile) {
             event.target.style.cursor = 'default';
         }
 
@@ -119,7 +121,7 @@ export default class Text {
         this.propagate('mousemove', event);
 
         if (this.selected) {
-            if (this.hover && !this.typing) {
+            if (this.hover && !this.typing && !Utils.isMobile) {
                 event.target.style.cursor = 'text';
             }
 

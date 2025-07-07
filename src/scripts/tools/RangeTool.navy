@@ -159,9 +159,10 @@ mousedown(event) {
     if ($core.meta.tool === 'RangeTool' || event.which === 2) {
         shift = true;
     }
-
     const layout = $core.layout
     if (state === 'idle' && shift) {
+        $core.meta.scrollLock = true;
+
         // Create the first pin
         pin1 = {
             t: $core.cursor.time,
@@ -169,6 +170,7 @@ mousedown(event) {
         }
         pin2 = { ...pin1 }
         state = 'drawing'
+
     } else if (state === 'drawing') {
         state = 'finished'
     } else if (state === 'finished') {
@@ -182,8 +184,7 @@ mousedown(event) {
 
 mousemove(event) {
     if (state === 'drawing') {
-        const layout = $core.layout
-        // Create the second pin
+        const layout = $core.layout;
         pin2 = {
             t: $core.cursor.time,
             v: layout.y2value(event.layerY)

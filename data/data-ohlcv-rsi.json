@@ -33611,22 +33611,7 @@
           "name": "LineTool",
           "type": "LineTool",
           "drawingTool": true,
-          "data": [
-            {
-              "type": "segment",
-              "p1": [
-                1702108800000,
-                73.05794116151363
-              ],
-              "p2": [
-                1702296000000,
-                75.23011872310508
-              ],
-              "uuid": "6822450897812908",
-              "color": "#dc9800",
-              "lineWidth": "1"
-            }
-          ],
+          "data": [],
           "props": {},
           "settings": {
             "zIndex": 1000
@@ -33636,18 +33621,7 @@
           "name": "LineToolHorizontalRay",
           "type": "LineToolHorizontalRay",
           "drawingTool": true,
-          "data": [
-            {
-              "type": "ray",
-              "p1": [
-                1702108800000,
-                71.05794116151363
-              ],
-              "uuid": "123",
-              "color": "#dc9800",
-              "lineWidth": "1"
-            }
-          ],
+          "data": [],
           "props": {},
           "settings": {
             "zIndex": 1000
@@ -33657,30 +33631,7 @@
           "name": "Rectangle",
           "type": "Rectangle",
           "drawingTool": true,
-          "data": [
-            {
-              "p1": [
-                1739991965044.6453,
-                3.311779593198992
-              ],
-              "p2": [
-                1739991965044.6453,
-                3.311779593198992
-              ],
-              "p3": [
-                1739991965044.6453,
-                3.311779593198992
-              ],
-              "p4": [
-                1739991965044.6453,
-                3.311779593198992
-              ],
-              "lineWidth": 2,
-              "color": "#B6B6B6",
-              "uuid": "1275448967036521",
-              "overlayType": "Rectangle"
-            }
-          ],
+          "data": [],
           "props": {},
           "settings": {
             "zIndex": 1000

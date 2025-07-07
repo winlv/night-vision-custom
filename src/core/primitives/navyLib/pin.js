@@ -43,7 +43,7 @@ export default class Pin {
             case 'tracking':
                 break
             case 'dragging':
-                if (!this.moved) this.draw_circle(ctx, circleColor)
+                this.draw_circle(ctx, circleColor)
                 break
             case 'settled':
                 this.draw_circle(ctx, circleColor)
@@ -118,7 +118,7 @@ export default class Pin {
                     this.state = 'dragging'
                     this.moved = false
                     this.core.events.emit('scroll-lock', true)
-                    //TODO: this.core.events.emit('object-selected') 
+                    //TODO: this.core.events.emit('object-selected')
                 }
                 break
         }

@@ -130,6 +130,11 @@
     })
 
     function onClick(type) {
+        if (type === 'Remove') {
+            chart.meta.removeTool();
+            return void 0;
+        }
+
         chart.events.emit('tool-selected', {type});
     }
 
@@ -184,6 +189,7 @@
             <li on:click={() => onClick('LongShortPosition')}>longshort</li>
             <li on:click={() => onClick('FibRetracement')}>fibRetracement</li>
             <li on:click={() => onClick('Text')}>Text</li>
+            <li on:click={() => onClick('Remove')}>Remove</li>
             <li>magnet</li>
         </ul>
     </div>

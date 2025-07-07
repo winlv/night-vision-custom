@@ -1,3 +1,5 @@
+import {Utils} from "../../../index.js";
+
 export default class FibRetracement {
 
     constructor(core, line, nw = false) {
@@ -54,6 +56,7 @@ export default class FibRetracement {
             this.drag.t = layout.x2time(event.layerX);
             this.drag.v = layout.y2value(event.layerY);
         }
+        this.hover = false;
     }
 
     mouseup(event) {
@@ -65,19 +68,19 @@ export default class FibRetracement {
 
     mousemove(event) {
         const pin = this.pins.find(pin => pin.hover() || pin.state === 'dragging');
-        if (pin?.cursor && this.state === 'settled') {
+        if (pin?.cursor && this.state === 'settled' && !Utils.isMobile) {
             event.target.style.cursor = pin.cursor;
         }
 
-        if (!pin && this.pinHover) {
+        if (!pin && this.pinHover && !Utils.isMobile) {
             event.target.style.cursor = 'default';
         }
 
-        if (this.collision() && this.state === 'settled') {
+        if (this.collision() && this.state === 'settled' && !Utils.isMobile) {
             event.target.style.cursor = 'move';
         }
 
-        if (!this.collision() && this.hover) {
+        if (!this.collision() && this.hover && !Utils.isMobile) {
             event.target.style.cursor = 'default';
         }
 

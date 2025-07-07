@@ -13,6 +13,7 @@ let lines = {} // Line objects stored by uuid
 
 init()
 {
+    console.log('init');
     $core.dataExt.lines = $core.data;
 
     // Restore lines from dataExt
@@ -48,9 +49,7 @@ draw(ctx)
     }
 }
 
-newLine()
-{
-
+function newLine() {
     if (unfinishedLines() || mouseMoved()) return
 
     if (!$core.dataExt.lines) {
@@ -127,7 +126,6 @@ removeLine(uuid)
 
 propagate(name, data)
 {
-    // TODO: sort by z-index
     for (const line of Object.values(lines)) {
         line[name](data)
     }
@@ -139,10 +137,10 @@ mousedown(event)
         timeId = setTimeout(newLine, 0)
     }
 
-    mouseX = $core.mouse.x
-    lineSelected(null)
-    $events.emit('update-layout')
-    propagate('mousedown', event)
+    mouseX = $core.mouse.x;
+    lineSelected(null);
+    $events.emit('update-layout');
+    propagate('mousedown', event);
 }
 
 mouseup(event)

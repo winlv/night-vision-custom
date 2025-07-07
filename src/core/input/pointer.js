@@ -144,13 +144,24 @@ export default class Input {
                 x: event.center.x + this.offsetX,
                 y: event.center.y + this.offsetY,
             });
+
+            if (Utils.isMobile) {
+                this.calcOffset();
+                // this.propagate('mousedown', this.touch2mouse(event));
+            }
         });
 
         mc.on("panmove", (event) => {
-            // if (Utils.isMobile) {
-            //    this.calcOffset();
-            //     this.propagate("mousemove", this.touch2mouse(event));
-            // }
+            if (Utils.isMobile) {
+               this.calcOffset();
+                this.events.emit('cursor-changed', {
+                    gridId: this.gridId,
+                    x: event.center.x + this.offsetX,
+                    y: event.center.y + this.offsetY
+                })
+               this.propagate("mousemove", this.touch2mouse(event));
+            }
+
             if (this.drug) {
                 if (Utils.isMobile) {
                     this.handleMousedrag(this.drug.x + event.deltaX, this.drug.y + event.deltaY);
@@ -171,11 +182,16 @@ export default class Input {
         });
 
         mc.on("panend", (event) => {
-            //if (Utils.isMobile && this.drug) {
-            //    this.panFade(event);
-            //}
+            if (Utils.isMobile && this.drug) {
+               this.panFade(event);
+            }
             this.drug = null;
             //  this.events.emit("cursor-locked", false);
+
+            if (Utils.isMobile) {
+                this.calcOffset();
+                this.propagate('mouseup', this.touch2mouse(event));
+            }
         });
 
         mc.on("tap", (event) => {
@@ -309,21 +325,21 @@ export default class Input {
     }
 
     panFade(event) {
-        let dt = Utils.now() - this.drug.t0;
-        let dx = this.range[1] - this.drug.r[1];
-        let v = (42 * dx) / dt;
-        let v0 = Math.abs(v * 0.01);
-        if (dt > 500) return;
-        if (this.fade) this.fade.stop();
-        this.fade = new FrameAnimation((self) => {
-            v *= 0.85;
-            if (Math.abs(v) < v0) {
-                self.stop();
-            }
-            this.range[0] += v;
-            this.range[1] += v;
-            this.changeRange();
-        });
+        // let dt = Utils.now() - this.drug.t0;
+        // let dx = this.range[1] - this.drug.r[1];
+        // let v = (42 * dx) / dt;
+        // let v0 = Math.abs(v * 0.01);
+        // if (dt > 500) return;
+        // if (this.fade) this.fade.stop();
+        // this.fade = new FrameAnimation((self) => {
+        //     v *= 0.85;
+        //     if (Math.abs(v) < v0) {
+        //         self.stop();
+        //     }
+        //     this.range[0] += v;
+        //     this.range[1] += v;
+        //     this.changeRange();
+        // });
     }
 
     calcOffset() {
