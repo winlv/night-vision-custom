@@ -5,7 +5,7 @@ import Layer from '../layer.js'
 import Const from '../../stuff/constants.js'
 import Events from '../events.js'
 
-const HPX = Const.HPX
+const HPX = Const.HPX;
 
 export default class Grid extends Layer {
 
@@ -16,13 +16,17 @@ export default class Grid extends Layer {
         this.events.on(`grid-layer:show-grid`, this.onShowHide.bind(this))
 
         this.id = id
-        this.zIndex = -1000000 // Deep down in the abyss
+        this.zIndex = -1000000
         this.ctxType = 'Canvas'
         this.show = true
+        this.lastMouseUpTime = 0;
+        this.doubleClickThreshold = 250;
 
         this.overlay = {
             draw: this.draw.bind(this),
-            destroy: this.destroy.bind(this)
+            destroy: this.destroy.bind(this),
+            mousedown: this.mousedown.bind(this),
+            mouseup: this.mouseup.bind(this),
         }
 
         this.env = {
@@ -69,6 +73,38 @@ export default class Grid extends Layer {
     }
 
     destroy() {
-        this.events.off('grid-layer')
+        this.events.off('grid-layer');
+        this.lastMouseUpTime = 0;
+    }
+
+    mousedown(event) {
+    }
+
+    mouseup(event) {
+        if (!this.props.config.DOUBLE_CLICK_ALERT) {
+            return void 0;
+        }
+
+        const now = Date.now();
+        const timeSinceLastUp = now - this.lastMouseUpTime;
+
+        if (timeSinceLastUp < this.doubleClickThreshold) {
+            this.onDoubleClick(event);
+            this.lastMouseUpTime = 0;
+        } else {
+            this.lastMouseUpTime = now;
+        }
+    }
+
+    onDoubleClick(event) {
+        const cursor = this.props.cursor;
+        const events = this.events = Events.instance(this.props.id)
+        const yValue = this.layout.y2value(cursor.y);
+        const data = {
+            gridId: this.id,
+            scaleId: this.layout.scaleSpecs.id,
+            yValue
+        };
+        events.emit('add-signal-level', data);
     }
 }

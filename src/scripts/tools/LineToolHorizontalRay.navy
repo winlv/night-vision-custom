@@ -13,7 +13,6 @@ let lines = {} // Line objects stored by uuid
 
 init()
 {
-    console.log('init');
     $core.dataExt.lines = $core.data;
 
     // Restore lines from dataExt

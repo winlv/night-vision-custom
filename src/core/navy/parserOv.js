@@ -228,6 +228,7 @@ export default class ParserOV {
             var keyup = null
             var keydown = null
             var keypress = null
+            var dbclick = null
 
             // Overlay code
             ${code}
@@ -242,7 +243,7 @@ export default class ParserOV {
                 legend, legendHtml,
                 valueTracker, ohlc,
                 mousemove, mouseout, mouseup,
-                mousedown, click, keyup, keydown,
+                mousedown, click, keyup, keydown, dbclick,
                 keypress,
                 // Generated flags
                 ${flags}

@@ -39,6 +39,7 @@ export default class Mouse {
                 f(event)
             }
         }
+
         if (name === 'mousemove') {
             this.x = event.layerX
             this.y = event.layerY

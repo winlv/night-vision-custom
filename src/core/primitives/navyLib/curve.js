@@ -17,6 +17,10 @@ export default class Curve {
         const layout = this.core.layout;
         const points = this.data.points;
 
+        if (!points) {
+            return void 0;
+        }
+
         ctx.moveTo(layout.time2x(points[0].x), layout.value2y(points[0].y));
 
         for (let i = 1; i < points.length - 1; i++) {

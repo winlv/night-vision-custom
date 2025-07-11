@@ -281,6 +281,7 @@ export default function Scale(id, src, specs) {
         // Over 0
         for (var y$ = y1; y$ > 0; y$ /= self.$_mult) {
             y$ = logRounder(y$, q)
+
             let y = Math.floor(math.log(y$) * self.A + self.B)
             self.ys.push([y, Utils.strip(y$)])
             if (y > height) break
@@ -329,30 +330,26 @@ export default function Scale(id, src, specs) {
         return y$
     }
 
-    // Make log scale levels look great again
-    function logRounder(x, quality) {
-        let s = Math.sign(x)
-        x = Math.abs(x)
-        if (x > 10) {
-            for (var div = 10; div < MAX_INT; div *= 10) {
-                let nice = Math.floor(x / div) * div
-                if (x / nice > quality) {  // More than 10% off
-                    break
-                }
+    function logRounder(x, quality = 1.05) {
+        const s = Math.sign(x);
+        x = Math.abs(x);
+
+        if (x === 0) return 0;
+
+        if (x >= 100) {
+            let div = 10;
+            while (div < 1e12) {
+                let nice = Math.floor(x / div) * div;
+                if (x / nice > quality) break;
+                div *= 10;
             }
-            div /= 10
-            return s * Math.floor(x / div) * div
-        } else if (x < 1) {
-            for (var ro = 10; ro >= 1; ro--) {
-                let nice = Utils.round(x, ro)
-                if (x / nice > quality) {  // More than 10% off
-                    break
-                }
-            }
-            return s * Utils.round(x, ro + 1)
-        } else {
-            return s * Math.floor(x)
+            div /= 10;
+            return s * Math.floor(x / div) * div;
         }
+
+        const exp = Math.floor(Math.log10(x));
+        const precision = Math.abs(exp) + 2;
+        return s * +x.toFixed(precision);
     }
 
     calc$Range()

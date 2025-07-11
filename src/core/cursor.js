@@ -143,6 +143,7 @@ export default class Cursor {
     // Copy of the same function from layoutFn.js
     y2value(y, scale) {
         let ls = scale.scaleSpecs.log
+        ls = false;
         if (ls) return math.exp((y - scale.B) / scale.A)
         return (y - scale.B) / scale.A
     }
