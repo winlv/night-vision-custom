@@ -1,0 +1,209 @@
+// Navy ~ 0.2-lite
+// <ds>Drawing lines [Tap + Hold]</ds>
+
+[OVERLAY name = TrendRay, ctx = Canvas, verion = 1.0.0]
+
+prop('color', { type: 'Color', def: '#b98200' })
+prop('lineType', {type: 'string', def: 'solid'});
+prop('lineWidth', {type: 'number', def: 1});
+prop('alert', {type: 'boolean', def: false});
+
+let timeId = null
+let mouseX = 0
+let lines = {} // Line objects stored by uuid
+
+init()
+{
+    $core.dataExt.lines = $core.data;
+
+    // Restore lines from dataExt
+    for (const line of $core.dataExt.lines || []) {
+        lines[line.uuid] = new $lib.TrendLine($core, line)
+        lines[line.uuid].onSelect = lineSelected
+    }
+}
+
+draw(ctx)
+{
+    if (!$core.dataExt.lines?.length && lines) {
+        Object.values(lines).forEach(x => removeLine(x.data.uuid))
+    }
+
+    for (const line of Object.values(lines)) {
+        line.draw(ctx)
+    }
+}
+
+function newLine() {
+    if (unfinishedLines() || mouseMoved()) return
+
+    if (!$core.dataExt.lines) {
+        $core.dataExt.lines = []
+    }
+
+    let t = $core.cursor.time
+    let $ = $core.layout.y2value($core.cursor.y)
+    let uuid = $lib.Utils.uuid3()
+
+    let line = {
+        type: 'trendRay',
+        p1: [t, $],
+        p2: [t, $],
+        uuid: uuid,
+        lineWidth: $props.lineWidth,
+        lineType: $props.lineType,
+        color: $props.color,
+        alert: $props.alert,
+        crossed: false
+    }
+    $core.dataExt.lines.push(line)
+    lines[uuid] = new $lib.TrendLine($core, line, true)
+    lines[uuid].onSelect = lineSelected
+    lines[uuid].selected = true
+
+    $events.emit('update-layout')
+}
+
+lineSelected($uuid)
+{
+    if (!$uuid) {
+        $events.emit('object-selected', {id: undefined, type: undefined});
+    }
+
+    for (const uuid in lines) {
+        const selected = uuid === $uuid;
+        lines[uuid].selected = selected;
+        if (selected) {
+            setTimeout(() => {
+                $events.emit('object-selected', {id: uuid, type: 'TrendRay'})
+            });
+        }
+    }
+    $events.emit('update-layout')
+}
+
+unfinishedLines()
+{
+
+    for (const line of Object.values(lines)) {
+        if (line.pins.some(x => x.state !== 'settled')) {
+            return true
+        }
+    }
+    return false
+}
+
+mouseMoved()
+{
+    let d = Math.abs(mouseX - $core.mouse.x)
+    return d > 5
+}
+
+function removeLine(uuid) {
+    if (lines[uuid]?.data?.alert) {
+        document.dispatchEvent(new CustomEvent("trend-signal-level-remove", {
+            detail: {
+                uuid
+            }
+        }));
+    }
+
+    delete lines[uuid]
+    $core.dataExt.lines = $core.dataExt.lines?.filter(x => x.uuid !== uuid) ?? [];
+    $events.emit('update-layout')
+
+    $events.emit('change-tool-data', {
+        data: $core.dataExt.lines,
+        id: $core.id
+    });
+    $events.emit('object-selected', {id: undefined, type: undefined});
+}
+
+propagate(name, data)
+{
+    for (const line of Object.values(lines)) {
+        line[name](data)
+    }
+}
+
+mousedown(event)
+{
+    if ($core.meta.tool === 'TrendRay') {
+        timeId = setTimeout(newLine, 0)
+    }
+
+    mouseX = $core.mouse.x;
+    lineSelected(null);
+    $events.emit('update-layout');
+    propagate('mousedown', event);
+}
+
+mouseup(event)
+{
+    clearTimeout(timeId)
+    timeId = null
+    propagate('mouseup', event);
+    if ($core.meta.tool === 'TrendRay') {
+        $events.emit('drawing-mode-off');
+    }
+
+    let s = Object.values(lines).find(x => x.selected);
+    if (s) {
+        $events.emit('change-tool-data', {
+            data: $core.dataExt.lines,
+            id: $core.id
+        });
+        if (s.data.alert) {
+            document.dispatchEvent(new CustomEvent("trend-signal-level-changed", {
+                detail: {
+                    p1: s.data.p1,
+                    p2: s.data.p2,
+                    uuid: s.data.uuid,
+                }
+            }));
+        }
+    }
+}
+
+mousemove(event)
+{
+    propagate('mousemove', event)
+}
+
+keydown(event)
+{
+    if (event.code === 'Backspace' || event.code === 'Delete') {
+        let s = Object.values(lines).find(x => x.selected)
+        if (s) removeLine(s.data.uuid)
+    }
+}
+
+let initialLow = 0;
+let initialHigh = 0;
+yRange(data, a, low)
+{
+    const updData = $core.data.slice(-500);
+    let len = updData.length;
+
+    var h, l, high = -Infinity, low = Infinity
+    if (initialLow && initialHigh) {
+        low = initialLow;
+        high = initialHigh;
+    } else {
+        for (let i = 0; i < len; i++) {
+            let point = updData[i];
+            if (!point) {
+                break;
+            }
+            if (point[2] > high) high = point[2];
+            if (point[3] < low) low = point[3];
+        }
+        initialLow = low;
+        initialHigh = high;
+    }
+    return [high, low]
+}
+
+legend()
+=>
+null

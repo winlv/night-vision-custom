@@ -36,6 +36,7 @@ import candleBodyTransparent from "../primitives/navyLib/candleBodyTransparent.j
 import ShortLongPositionShape from "../primitives/navyLib/shortLongPositionShape.js";
 import FibRetracement from "../primitives/navyLib/fibRetracement.js";
 import FibRetracementShape from "../primitives/navyLib/fibRetracementShape.js";
+import TrendRay from "../primitives/navyLib/trendRay.js";
 
 const formatCash = Utils.formatCash
 
@@ -68,7 +69,7 @@ export default class OverlayEnv {
             candleBody, candleBodyTransparent, candleWick, volumeBar,
             fastSma, avgVolume, candleColor,
             roundRect, rescaleFont, drawArrow,
-            TrendLine, Segment, Pin, Ray, Brush, Curve, Rectangle, RectangleShape, RectanglePin, ShortLongPosition, ShortLongPositionShape,
+            TrendLine, Segment, TrendRay, Pin, Ray, Brush, Curve, Rectangle, RectangleShape, RectanglePin, ShortLongPosition, ShortLongPositionShape,
             FibRetracement, FibRetracementShape, Text,
             Utils
         }

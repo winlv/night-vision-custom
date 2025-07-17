@@ -10052,6 +10052,16 @@
           }
         },
         {
+          "name": "TrendRay",
+          "type": "TrendRay",
+          "drawingTool": true,
+          "data": [],
+          "props": {},
+          "settings": {
+            "zIndex": 1000
+          }
+        },
+        {
           "name": "Rectangle",
           "type": "Rectangle",
           "drawingTool": true,
