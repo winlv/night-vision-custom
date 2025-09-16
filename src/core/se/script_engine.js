@@ -85,7 +85,8 @@ class ScriptEngine {
         let script = self.scriptLib.iScripts[s.type]
         if (!script) {
             delete this.map[s.uuid]
-            return console.log('Unknown script: ', s.type)
+            // return console.log('Unknown script: ', s.type)
+            return;
         }
 
         s.code = {

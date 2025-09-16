@@ -29,8 +29,10 @@ export default class Heatmap {
         this.heatmapApp = new PIXI.Application({
             backgroundAlpha: 0,
             clearBeforeRender: true,
-            antialias: false,
-            resizeTo: window
+            antialias: true,
+            autoDensity: true,
+            resizeTo: window,
+            resolution: window.devicePixelRatio || 1,
         });
 
         this.heatmapApp.view.style.position = 'absolute';

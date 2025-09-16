@@ -68,6 +68,7 @@ export default class Rectangle {
 
     mousedown(event) {
         this.propagate('mousedown', event)
+
         if (this.collision()) {
             this.onSelect(this.data.uuid)
             this.core.events.emit('scroll-lock', true);
@@ -87,6 +88,15 @@ export default class Rectangle {
     }
 
     mousemove(event) {
+        if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
+            return void 0;
+        }
+
+        console.log(this.state);
+        if (this.state !== 'tracking' && this.core.meta.tool !== 'Cursor') {
+            return void 0;
+        }
+
         const pin = this.pins.find(pin => pin.hover() || pin.state === 'tracking');
         if (pin?.cursor && this.state === 'settled' && !Utils.isMobile) {
             event.target.style.cursor = pin.cursor;

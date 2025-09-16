@@ -162,8 +162,10 @@
         padding: 2px 5px;
         margin-bottom: 2px;
         width: fit-content;
-        display: flex;
         z-index: 10;
+        height: 24px;
+        display: flex;
+        align-items: center;
     }
 
     .nvjs-logo {

@@ -28,11 +28,25 @@ function draw(ctx) {
     }
 }
 
+let pressedAlt = false;
 function keydown(event) {
     if (event.code === 'Backspace' || event.code === 'Delete') {
         let s = Object.values(rectangles).find(x => x.selected)
         if (s) removeRectangle(s.data.uuid)
     }
+
+    if (pressedAlt && event.code === 'KeyR') {
+        timeId = setTimeout(newRectangle, 0)
+
+        mouseX = $core.mouse.x;
+        rectangleSelected(null);
+        $events.emit('update-layout');
+    }
+    pressedAlt = event.code.toLowerCase().includes('alt');
+}
+
+function keyup(event) {
+    pressedAlt = false;
 }
 
 function mousedown(event) {

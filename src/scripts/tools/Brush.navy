@@ -29,20 +29,26 @@ function draw(ctx) {
     }
 }
 
+let pressedAlt = false;
 function keydown(event) {
-    if (event.code === 'KeyB') {
-        const timeout = $core.meta.tool === 'Brush' ? 0 : 50000;
-        timeId = setTimeout(newBrush, timeout)
+    if (pressedAlt && event.code === 'KeyB') {
         mouseX = $core.mouse.x;
         brushSelected(null);
         $events.emit('update-layout');
-        propagate('keydown', event);
+        timeId = setTimeout(newBrush, 0)
+        return void 0;
     }
 
     if (event.code === 'Backspace' || event.code === 'Delete') {
         let s = Object.values(brushes).find(x => x.selected)
         if (s) removeBrush(s.data.uuid);
     }
+
+    pressedAlt = event.code.toLowerCase().includes('alt');
+}
+
+function keyup(event) {
+    pressedAlt = false;
 }
 
 function mousedown(event) {

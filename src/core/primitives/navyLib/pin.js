@@ -94,6 +94,10 @@ export default class Pin {
     }
 
     mousemove(event) {
+        if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
+            return void 0;
+        }
+
         switch (this.state) {
             case 'tracking':
             case 'dragging':

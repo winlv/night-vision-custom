@@ -79,6 +79,10 @@ export default class Brush {
     mousedown(event) {
         this.propagate('mousedown', event)
         if (this.collision()) {
+            if (this.core.meta.tool !== 'Cursor') {
+                return void 0;
+            }
+
             this.core.events.emit('scroll-lock', true);
 
             const layout = this.core.layout;
@@ -101,6 +105,14 @@ export default class Brush {
     }
 
     mousemove(event) {
+        if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
+            return void 0;
+        }
+
+        if (this.state !== 'dragging' && this.core.meta.tool !== 'Cursor') {
+            return void 0;
+        }
+
         if (this.collision() && this.state === 'settled' && !Utils.isMobile) {
             event.target.style.cursor = 'move';
         }

@@ -24,25 +24,25 @@ export default class Parser {
         this.indicators = []
 
         if (this.scriptVers === 0) {
-            console.warn(`${name}: There is no script version string`)
+            // console.warn(`${name}: There is no script version string`)
         }
 
         if (this.scriptVers > this.version) {
-            console.warn(`${name}: Script version > parser version`)
+            // console.warn(`${name}: Script version > parser version`)
         }
 
         if (this.scriptVers < 0.2 && 
             src.includes('OVERLAY') && src.includes('yRange')) {
-            console.warn(`${name}: Update yRange() function (see docs)`)
+            // console.warn(`${name}: Update yRange() function (see docs)`)
         }
 
         if (this.scriptTag !== TAG) {
-            console.warn(
-                `${name}: Script version should have 'lite' tag\n` +
-                `Most likely are using the community version of NavyJS\n` +
-                `with a script written for the PRO version.\n` +
-                `If not the case just use 'lite' tag: ${VERSION}-lite`
-            )
+            // console.warn(
+            //     `${name}: Script version should have 'lite' tag\n` +
+            //     `Most likely are using the community version of NavyJS\n` +
+            //     `with a script written for the PRO version.\n` +
+            //     `If not the case just use 'lite' tag: ${VERSION}-lite`
+            // )
         }
 
         this.overlayTags()

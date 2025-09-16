@@ -88,6 +88,10 @@ export default class Text {
     mousedown(event) {
         this.propagate('mousedown', event)
         if (this.collision()) {
+            if (this.core.meta.tool !== 'Cursor') {
+                return void 0;
+            }
+
             if (this.selected) {
                 this.typing = true;
             }
@@ -113,6 +117,14 @@ export default class Text {
     };
 
     mousemove(event) {
+        if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
+            return void 0;
+        }
+
+        if (this.core.meta.tool !== 'Cursor') {
+            return void 0;
+        }
+
         if (!this.collision() && this.hover && !Utils.isMobile) {
             event.target.style.cursor = 'default';
         }

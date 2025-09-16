@@ -5,6 +5,7 @@
 import Layer from '../layer.js'
 import Const from '../../stuff/constants.js'
 import Events from "../events.js";
+import MetaHub from "../metaHub.js";
 
 const HPX = Const.HPX
 
@@ -22,6 +23,7 @@ export default class Crosshair extends Layer {
         this.show = true;
         this.signalLevelActionHover = false;
         this.actionSize = 22;
+        this.meta = MetaHub.instance(nvId)
 
         this.overlay = {
             draw: this.draw.bind(this),
@@ -108,6 +110,10 @@ export default class Crosshair extends Layer {
     }
 
     click(event) {
+        if (this.meta.selectedTool) {
+            return void 0;
+        }
+
         const actionButtonHovered = this.actionButtonHovered(event);
         if (actionButtonHovered) {
             const cursor = this.props.cursor;

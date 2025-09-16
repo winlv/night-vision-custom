@@ -50,7 +50,7 @@ function border(props, layout, side, ctx) {
 
             ctx.clearRect(x, y, w, h)
 
-            ctx.strokeStyle = props.colors.scale
+            // ctx.strokeStyle = props.colors.scale
 
             ctx.beginPath()
             ctx.moveTo(x + HPX + w, 0)

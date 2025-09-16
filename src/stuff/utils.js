@@ -309,9 +309,9 @@ export default {
 
     // Delayed warning, f = condition lambda fn
     warn(f, text, delay = 0) {
-        setTimeout(() => {
-            if (f()) console.warn(text)
-        }, delay)
+        // setTimeout(() => {
+        //     if (f()) console.warn(text)
+        // }, delay)
     },
 
     // Checks if script props updated
