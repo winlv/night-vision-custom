@@ -57,6 +57,7 @@
     //data.indexBased = true
 
     onMount(() => {
+        console.log('mount');
         chart = new NightVision('chart-container', {
             data: data,
             timezone: new Date().getTimezoneOffset() / -60,
@@ -138,6 +139,35 @@
         chart.events.emit('tool-selected', {type});
     }
 
+    function redraw() {
+        chart.destroy();
+        chart = undefined;
+
+        setTimeout(() => {
+            chart = new NightVision('chart-container', {
+                data: data,
+                timezone: new Date().getTimezoneOffset() / -60,
+                autoResize: true,
+                indexBased: true,
+                scrollLock: true,
+                id: 'newid',
+                config: {
+                    ZOOM_MODE: 'tl',
+                    SCROLL_WHEEL: 'prevent',
+                    scrollLock: true,
+                    SBMAX: 500,
+                    DEFAULT_LEN: 250,
+                    meta: {
+                        scrollLock: true
+                    }
+                },
+                meta: {
+                    scrollLock: true
+                },
+            })
+        }, 1000)
+    }
+
 </script>
 <style>
     .app {
@@ -192,6 +222,7 @@
             <li on:click={() => onClick('Text')}>Text</li>
             <li on:click={() => onClick('Remove')}>Remove</li>
             <li>magnet</li>
+            <li on:click={() => redraw('redraw')}>redraw</li>
         </ul>
     </div>
     <span style="margin-top: 100px;">

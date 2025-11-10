@@ -11,7 +11,6 @@ class SeClient {
         this.chart = chart
         this.ww = chart.ww
         this.ww.onevent = this.onEvent.bind(this)
-
     }
 
     setRefs(hub, scan) {

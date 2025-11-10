@@ -258,6 +258,7 @@ class NightVision {
         console.log('chart destroy');
         this.comp.$destroy();
         this.ww.stop();
+        // this.root = undefined;
     }
 }
 

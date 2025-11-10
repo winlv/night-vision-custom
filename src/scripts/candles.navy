@@ -95,6 +95,12 @@ legendHtml(x, prec, f) {
     let color2 = v[4] >= v[1] ?
         $props.colorBodyUp : $props.colorBodyDw
     let fc = $lib.formatCash
+
+    let i1 = $core.view.i1
+    let i2 = $core.view.i2
+    let sma = $lib.fastSma($core.data, 5, i1, i2, 20)
+    const avgV = sma?.length ? sma.find(smaValue => smaValue[0] === $core.cursor.time) ?? sma[sma.length - 1] : [0, 0];
+
     return `
     <span style="color: ${color2}">
         <span style="margin-left: 3px;"></span>
@@ -111,4 +117,9 @@ legendHtml(x, prec, f) {
         <span style="color: ${color1}">V</span>
         <span class="nvjs-ll-value">${sym+fc(x[5])}</span>` : ``)
     + `</span>`
-    }
+
+        + ($props.showVolume ? `
+        <span style="color: ${color1}">Avg</span>
+        <span class="nvjs-ll-value" style="color: cornflowerblue">${avgV[1].toFixed(0)}</span>` : ``)
+        + `</span>`
+}

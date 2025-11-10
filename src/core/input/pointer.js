@@ -86,6 +86,7 @@ export default class Input {
         this.offsetY = 0;
         this.deltas = 0; // Wheel delta events
         this.wmode = this.props.config.SCROLL_WHEEL;
+        this.lastZoomTime = 0;
 
         this.hub = DataHub.instance(this.props.id);
         this.meta = MetaHub.instance(this.props.id);
@@ -350,6 +351,10 @@ export default class Input {
 
     mousezoom(delta, event) {
         if (this.meta.scrollLock) return;
+
+        const now = performance.now();
+        if (now - this.lastZoomTime < 16) return;
+        this.lastZoomTime = now;
 
         // TODO: for mobile
         if (this.wmode !== "pass") {

@@ -99,7 +99,8 @@ export default class Grid extends Layer {
     onDoubleClick(event) {
         const cursor = this.props.cursor;
         const events = this.events = Events.instance(this.props.id)
-        const yValue = this.layout.y2value(cursor.y);
+        const yValue = this.layout.y2value(event.layerY);
+
         const data = {
             gridId: this.id,
             scaleId: this.layout.scaleSpecs.id,

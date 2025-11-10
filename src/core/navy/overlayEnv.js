@@ -75,7 +75,6 @@ export default class OverlayEnv {
         }
 
         this.$core.lib = this.lib
-
     }
 
     // Defines new property

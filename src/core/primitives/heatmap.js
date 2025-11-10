@@ -2,6 +2,7 @@ import Layer from "../layer.js";
 import * as PIXI from 'pixi.js';
 import Events from "../events.js";
 import MetaHub from "../metaHub.js";
+import Utils from "../../stuff/utils.js";
 
 export default class Heatmap {
     heatmapApp = undefined;
@@ -29,8 +30,8 @@ export default class Heatmap {
         this.heatmapApp = new PIXI.Application({
             backgroundAlpha: 0,
             clearBeforeRender: true,
-            antialias: true,
-            autoDensity: true,
+            antialias: !Utils.isMobile,
+            autoDensity: !Utils.isMobile,
             resizeTo: window,
             resolution: window.devicePixelRatio || 1,
         });
