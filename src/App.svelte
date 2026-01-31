@@ -148,7 +148,6 @@
                 data: data,
                 timezone: new Date().getTimezoneOffset() / -60,
                 autoResize: true,
-                indexBased: true,
                 scrollLock: true,
                 id: 'newid',
                 config: {
@@ -221,7 +220,7 @@
             <li on:click={() => onClick('FibRetracement')}>fibRetracement</li>
             <li on:click={() => onClick('Text')}>Text</li>
             <li on:click={() => onClick('Remove')}>Remove</li>
-            <li>magnet</li>
+            <li on:click={() => onClick('Magnet')}>magnet</li>
             <li on:click={() => redraw('redraw')}>redraw</li>
         </ul>
     </div>

@@ -10119,7 +10119,7 @@
       "settings": {
         "scales": {
           "A": {
-            "log": true
+            "log": false
           }
         }
       }

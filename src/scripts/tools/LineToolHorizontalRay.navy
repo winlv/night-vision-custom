@@ -28,6 +28,7 @@ draw(ctx)
         Object.values(lines).forEach(x => removeLine(x.data.uuid))
     }
 
+    const layout = $core.layout;
     const currentPrice = $core.hub?.mainOv?.data?.[$core.hub.mainOv.data.length - 1]?.[4] ?? 0;
 
     for (const line of Object.values(lines)) {

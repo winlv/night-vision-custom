@@ -10,6 +10,8 @@ export default class TrendLine {
         this.data = line
         this.hover = false
         this.selected = false
+        this.isDragging = false;
+        this.lastMousePos = { t: 0, v: 0 };
         this.onSelect = () => {
         }
         switch (line.type) {
@@ -118,30 +120,64 @@ export default class TrendLine {
 
     mousedown(event) {
         this.propagate('mousedown', event)
-        if (this.collision()) {
-            if (this.core.meta.tool !== 'Cursor') {
-                return void 0;
-            }
 
-            this.onSelect(this.data.uuid)
+        const pinIsDragging = this.pins.some(p => p.state === 'dragging' || p.state === 'tracking');
+
+        if (!pinIsDragging && this.collision()) {
+            if (this.core.meta.tool !== 'Cursor') return;
+
+            this.isDragging = true;
+            this.lastMousePos = {
+                t: this.core.cursor.time,
+                v: this.core.layout.y2value(this.core.mouse.y)
+            };
+
+            this.onSelect(this.data.uuid);
+            this.core.events.emit('scroll-lock', true);
         }
-        this.hover = false;
     }
 
     mouseup(event) {
-        this.propagate('mouseup', event)
+        this.propagate('mouseup', event);
+
+        if (this.isDragging) {
+            this.isDragging = false;
+            this.core.events.emit('scroll-lock', false);
+        }
     }
 
     mousemove(event) {
         if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
-            return void 0;
+            return;
         }
 
-        if (this.core.meta.tool !== 'Cursor') {
-            return void 0;
+        if (this.isDragging) {
+            const currentT = this.core.cursor.time;
+            const currentV = this.core.layout.y2value(this.core.mouse.y);
+
+            const dt = currentT - this.lastMousePos.t;
+            const dv = currentV - this.lastMousePos.v;
+
+            if (this.data.p1) {
+                this.data.p1[0] += dt;
+                this.data.p1[1] += dv;
+            }
+            if (this.data.p2) {
+                this.data.p2[0] += dt;
+                this.data.p2[1] += dv;
+            }
+
+            for (let pin of this.pins) {
+                pin.init();
+            }
+
+            this.lastMousePos = { t: currentT, v: currentV };
+            return;
         }
 
-        this.hover = this.collision()
-        this.propagate('mousemove', event)
+        if (this.core.meta.tool !== 'Cursor') return;
+
+        this.hover = this.collision();
+        this.propagate('mousemove', event);
     }
 }

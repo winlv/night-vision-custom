@@ -106,6 +106,6 @@ export default class Grid extends Layer {
             scaleId: this.layout.scaleSpecs.id,
             yValue
         };
-        events.emit('add-signal-level', data);
+        // events.emit('add-signal-level', data);
     }
 }
