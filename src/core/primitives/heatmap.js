@@ -118,8 +118,6 @@ export default class Heatmap {
         const cacheKey = JSON.stringify(maxVolumesMap);
         if (this.lastScales.asks === cacheKey) return;
 
-        console.log(maxVolumesMap);
-
         this.palettes = { asks: {}, bids: {} };
 
         for (const [exName, maxVol] of Object.entries(maxVolumesMap)) {
@@ -162,39 +160,48 @@ export default class Heatmap {
             const x = layout.ti2xWithoutRound(timestamp) - cellWidth / 2;
             if (x + cellWidth < 0 || x > layout.width) continue;
 
-            const renderSide = (orders, type) => {
-                for (let j = 0; j < orders.length; j += 3) {
-                    if (idx + 8 >= this.instanceBuffer.length) break;
+            const minVisiblePrice = layout.y2value(layout.height);
+            const maxVisiblePrice = layout.y2value(0);
 
+            const renderSide = (orders, type) => {
+                const len = orders.length;
+                const currentPalettes = this.palettes[type];
+
+                for (let j = 0; j < len; j += 3) {
                     const price = orders[j];
+
+                    if (price < minVisiblePrice || price > maxVisiblePrice + step) continue;
+
                     const qty = orders[j+1];
-                    const exId = orders[j+2]; // 'bi-f', 'bi-s' и т.д.
+                    const exId = orders[j+2];
 
                     const exName = EXCHANGES_CONFIG[exId];
-                    const maxVol = maxVolumesMap[exName] || 100000;
-                    const palette = this.palettes[type][exName];
-
+                    const palette = currentPalettes[exName];
                     if (!palette) continue;
 
                     const val = price * qty;
-                    const intensity = Math.min(val / maxVol, 1.0);
-                    const pIdx = (intensity * (this.PALETTE_SIZE - 1)) | 0;
-                    const pOff = pIdx * 4;
+                    const maxVol = maxVolumesMap[exName] || 100000;
+
+                    const intensity = val / maxVol;
+                    const pIdx = (intensity * 255) | 0;
+                    const pOff = pIdx << 2;
 
                     const y = layout.value2y(price + step, false);
 
-                    this.instanceBuffer[idx]     = x;
-                    this.instanceBuffer[idx + 1] = y;
-                    this.instanceBuffer[idx + 2] = cellWidth;
-                    this.instanceBuffer[idx + 3] = cellHeight;
-                    this.instanceBuffer[idx + 4] = palette[pOff];
-                    this.instanceBuffer[idx + 5] = palette[pOff + 1];
-                    this.instanceBuffer[idx + 6] = palette[pOff + 2];
-                    this.instanceBuffer[idx + 7] = palette[pOff + 3];
+                    const offset = idx;
+                    this.instanceBuffer[offset]     = x;
+                    this.instanceBuffer[offset + 1] = y;
+                    this.instanceBuffer[offset + 2] = cellWidth;
+                    this.instanceBuffer[offset + 3] = cellHeight;
+                    this.instanceBuffer[offset + 4] = palette[pOff];
+                    this.instanceBuffer[offset + 5] = palette[pOff + 1];
+                    this.instanceBuffer[offset + 6] = palette[pOff + 2];
+                    this.instanceBuffer[offset + 7] = palette[pOff + 3];
                     idx += 8;
+
+                    if (idx >= this.MAX_INSTANCES * 8) break;
                 }
             };
-
             if (levels.a) renderSide(levels.a, 'asks');
             if (levels.b) renderSide(levels.b, 'bids');
         }

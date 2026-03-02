@@ -1,7 +1,17 @@
 [OVERLAY name = Heatmap, ctx = Canvas, version = 1.0.0]
 
-prop('colorScaleAsks', {type: 'string', def: {'BINANCE_FUTURES': (value) => gradient(value, 'asks')(value)}});
-prop('colorScaleBids', {type: 'string', def: {'BINANCE_FUTURES': (value) => gradient(value, 'bids')(value)}});
+prop('colorScaleAsks', {type: 'string', def: {
+        'BINANCE_FUTURES': (value) => gradient(value, 'asks')(value),
+        'BINANCE_SPOT': (value) => gradient(value, 'asks')(value),
+        'BYBIT_SPOT': (value) => gradient(value, 'asks')(value),
+        'OKX_SPOT': (value) => gradient(value, 'asks')(value)
+    }});
+prop('colorScaleBids', {type: 'string', def: {
+        'BINANCE_FUTURES': (value) => gradient(value, 'asks')(value),
+        'BINANCE_SPOT': (value) => gradient(value, 'asks')(value),
+        'BYBIT_SPOT': (value) => gradient(value, 'asks')(value),
+        'OKX_SPOT': (value) => gradient(value, 'asks')(value)
+    }});
 
 prop('showLabels',     { type: 'boolean', def: true });
 prop('aggregationStep', { type: 'number', def: 0 });
@@ -75,6 +85,7 @@ function draw(ctx) {
                     }
                 }
             }
+
             const x = $core.layout.ti2xWithoutRound(ts);
             if (x >= 0 && x <= $core.layout.width) {
                 findMax(aggA);
@@ -84,13 +95,13 @@ function draw(ctx) {
             return [ts, { a: aggA, b: aggB }];
         });
 
-        calculateSpoofing(processedData);
+        // calculateSpoofing(processedData);
         clearFlags(flags);
     }
 
     updateGPUData();
     drawVolumeLabels(ctx);
-    drawSpoofingLines(ctx);
+    // drawSpoofingLines(ctx);
 }
 
 function calculateSpoofing(data) {
@@ -254,8 +265,15 @@ function clearFlags(flags) {
     window[$core.props.id] = flags;
 }
 
+let prevRange = "";
 function updateGPUData() {
     const step = $props.aggregationStep;
+
+    const crntRange = JSON.stringify($core.range) + $core.layout.$hi + $core.layout.$low;
+
+    if (prevRange === crntRange) {
+        return;
+    }
 
     $core.meta.heatmap.updateData(
         processedData,
@@ -267,6 +285,8 @@ function updateGPUData() {
         getExchangeName,
         maxVolumesMap
     );
+
+    prevRange = crntRange;
 }
 
 function getStage() {
