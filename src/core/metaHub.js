@@ -8,7 +8,6 @@ import Heatmap from "./primitives/heatmap.js";
 class MetaHub {
 
     constructor(nvId) {
-
         let events = Events.instance(nvId);
         this.hub = DataHub.instance(nvId)
         this.events = events
@@ -26,14 +25,14 @@ class MetaHub {
         events.on('meta:keyboard-keydown', this.handleKeyboardDown.bind(this));
         events.on('meta:keyboard-keyup', this.handleKeyboardUp.bind(this));
 
-        // Persistent meta storage
         this.storage = {};
         this.heatmap = undefined;
 
         this.tool = 'Cursor';
         this.drawingMode = false;
         this.selectedTool = undefined;
-        this.magnet = false
+        this.magnet = false;
+        this.tempMagnet = false;
     }
 
     init(props, layout) {
@@ -60,14 +59,93 @@ class MetaHub {
         this.scrollLock = false // Scroll lock state
     }
 
+    setTool(toolName) {
+        if (this.tool === toolName && toolName !== 'Cursor') {
+            this.tool = 'Cursor';
+        } else {
+            this.tool = toolName;
+        }
+
+        this.drawingMode = this.tool !== 'Cursor' && this.tool !== 'Magnet';
+
+        if (this.tool === 'Magnet') {
+            this.magnet = !this.magnet;
+            this.tool = 'Cursor';
+        }
+
+        if (this.drawingMode) {
+            this.objectSelected({ id: undefined });
+        }
+
+        this.events.emit('meta:tool-changed', {
+            tool: this.tool,
+            drawingMode: this.drawingMode,
+            magnet: this.magnet
+        });
+    }
+
     handleKeyboardDown(event) {
-        this.magnet = event.ctrlKey;
+        if (event.ctrlKey) {
+            this.tempMagnet = true;
+        }
     }
 
     handleKeyboardUp(event) {
-        if (this.magnet) {
-            this.magnet = false;
+        this.tempMagnet = false;
+    }
+
+    get isMagnetActive() {
+        return this.magnet || this.tempMagnet;
+    }
+
+    toolSelected = (event) => {
+        this.setTool(event.type);
+    }
+
+    drawingModeOff = () => {
+        this.tool = 'Cursor';
+        this.drawingMode = false;
+        this.events.emit('meta:tool-changed', { tool: 'Cursor', drawingMode: false });
+    }
+
+    objectSelected = ({id}) => {
+        this.selectedTool = id;
+
+        const root = this.hub.se.chart.root;
+        if (root) {
+            if (id) {
+                root.style.cursor = 'pointer';
+            } else if (this.drawingMode) {
+                root.style.cursor = 'crosshair';
+            } else {
+                root.style.cursor = 'default';
+            }
         }
+    }
+
+    removeTool = (uuid) => {
+        const pane = this.hub.data.panes[0];
+        if (!pane) return;
+
+        for (const drawingOverlay of pane.overlays) {
+            if (drawingOverlay.drawingTool && drawingOverlay.data) {
+                const idx = drawingOverlay.data.findIndex(d => d.uuid === uuid);
+                if (idx !== -1) {
+                    drawingOverlay.data.splice(idx, 1);
+                    if (drawingOverlay.dataExt) {
+                        for (let key in drawingOverlay.dataExt) {
+                            if (Array.isArray(drawingOverlay.dataExt[key])) {
+                                drawingOverlay.dataExt[key].splice(idx, 1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        this.events.emit('object-selected', {id: undefined});
+        this.events.emitSpec('chart', 'update-layout');
+        this.events.emit('commit-tool-changes');
     }
 
     initHeatmap(id) {
@@ -101,42 +179,6 @@ class MetaHub {
         this.events.emit('commit-tool-changes');
     }
 
-    objectSelected = ({id}) => {
-        this.selectedTool = id;
-
-        if (!id) {
-            const allCanvas = this.hub.se.chart.root.querySelectorAll('canvas');
-            for (const canvas of allCanvas) {
-                canvas.style.cursor = 'default';
-            }
-        }
-    }
-
-    removeTool = (uuid) => {
-        for (const drawingOverlay of this.hub.data.panes[0].overlays) {
-            if (drawingOverlay.drawingTool) {
-                const drawingToolIdx = drawingOverlay.data.findIndex(d => d.uuid === uuid);
-                if (drawingToolIdx !== -1) {
-                    drawingOverlay.data.splice(drawingToolIdx, 1);
-                    if (drawingOverlay.dataExt?.rectangles) {
-                        drawingOverlay.dataExt.rectangles?.splice(drawingToolIdx, 1);
-                    }
-                    if (drawingOverlay.dataExt?.lines) {
-                        drawingOverlay.dataExt.lines?.splice(drawingToolIdx, 1);
-                    }
-                    if (drawingOverlay.dataExt?.brushes) {
-                        drawingOverlay.dataExt.brushes?.splice(drawingToolIdx, 1);
-                    }
-                }
-            }
-        }
-
-        this.drawingModeOff();
-        this.events.emit('object-selected', {id: undefined});
-        this.events.emitSpec('chart', 'update-layout');
-        this.events.emit('commit-tool-changes');
-    }
-
     removeAllTools = () => {
         for (const drawingOverlay of this.hub.data.panes[0].overlays) {
             if (drawingOverlay.drawingTool) {
@@ -149,26 +191,6 @@ class MetaHub {
         this.events.emit('object-selected', {id: undefined});
         this.events.emitSpec('chart', 'update-layout');
         this.events.emit('commit-tool-changes');
-    }
-
-    drawingModeOff = () => {
-        this.tool = 'Cursor';
-        this.drawingMode = false;
-    }
-
-    toolSelected = (event) => {
-        if (this.tool === event.type) {
-            this.magnet = false;
-            this.tool = 'Cursor';
-            this.drawingMode = false;
-            return void 0;
-        }
-
-        this.tool = event.type;
-
-        if (this.tool === 'Magnet') {
-            this.magnet = true;
-        }
     }
 
     // Extract meta functions from overlay

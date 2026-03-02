@@ -20,6 +20,7 @@ import Trackers from '../core/primitives/trackers.js'
 
 // Renderers
 import Canvas from '../components/renderers/Canvas.svelte'
+import Resizer from "./Resizer.svelte";
 
 export let id // Pane/grid id
 export let props // General props
@@ -229,4 +230,7 @@ function onTask(event) {
                 props={props} rr={rr}/>
         {/if}
     {/each}
+
+    {#if !main} <Resizer {layout} {props} {id} />
+    {/if}
 </div>

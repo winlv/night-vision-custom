@@ -47,19 +47,38 @@ export default class Trackers extends Layer {
             if (!vt) continue
             let data = this.hub.ovData(this.gridId, i) || []
             let last = data[data.length - 1] || []
-            let tracker = vt(last)
-            tracker.ovId = i
+            let tracker = vt(last);
 
-            if (!tracker.show || tracker.value === undefined) continue
+            if (Array.isArray(tracker)) {
+                for (const singleTracker of tracker) {
+                    singleTracker.ovId = i
 
-            tracker.y = this.layout.value2y(tracker.value)
-            tracker.color = tracker.color || this.props.colors.scale
-            if (tracker.line){
-                priceLine(this.layout, ctx, tracker)
+                    if (!singleTracker.show || singleTracker.value === undefined) continue
+
+                    singleTracker.y = this.layout.value2y(singleTracker.value)
+                    singleTracker.color = singleTracker.color || this.props.colors.scale
+                    if (singleTracker.line){
+                        priceLine(this.layout, ctx, singleTracker)
+                    }
+
+                    // Save from repeating the loop
+                    this.trackers.push(singleTracker)
+                }
+            } else {
+                tracker.ovId = i
+
+                if (!tracker.show || tracker.value === undefined) continue
+
+                tracker.y = this.layout.value2y(tracker.value)
+                tracker.color = tracker.color || this.props.colors.scale
+                if (tracker.line){
+                    priceLine(this.layout, ctx, tracker)
+                }
+
+                // Save from repeating the loop
+                this.trackers.push(tracker)
             }
 
-            // Save from repeating the loop
-            this.trackers.push(tracker)
         }
 
     }

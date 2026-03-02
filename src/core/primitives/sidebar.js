@@ -107,12 +107,12 @@ function tracker(props, layout, scale, side, ctx, tracker) {
     let x = S ? 1 : 4
     let y = tracker.y - panHeight * 0.5 + HPX
     let a = S ? 7 : panWidth - 3
-    let h = ct ? Math.floor(panHeight * 1.75) + 2 + HPX : panHeight
+    let h = ct && !tracker.additional ? Math.floor(panHeight * 1.75) + 2 + HPX : panHeight
     roundRect(ctx, x , y, panWidth, h, 3, S)
     ctx.fillStyle = isColorDark(tracker.color) ? '#ffffff' : '#000000';
     ctx.textAlign = S ? 'left' : 'right'
     ctx.fillText(lbl, a, y + panHeight - 4) // TODO: remove hardcode
-    if (ct) {
+    if (ct && !tracker.additional) {
         let rt = Utils.getCandleTime(props.timeFrame)
         ctx.textAlign = S ? 'left' : 'right'
         ctx.fillText(rt, a, y + panHeight + 9) // TODO: remove hardcode

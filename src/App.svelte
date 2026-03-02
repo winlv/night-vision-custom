@@ -5,10 +5,10 @@
     import.meta.hot
     import {NightVision} from './index.js'
     import {onMount} from 'svelte'
-    // import data from '../data/data-ohlcv.json?id=main'
-    import data from '../data/data-ohlcv-rsi.json?id=main'
-    import data2 from '../data/data-area.json?id=main-2'
-    // import data3 from '../data/data-aapl.json?id=main-3'
+    import data from '../data/data-ohlcv.json?id=main'
+    // import data from '../data/data-ohlcv-rsi.json?id=main'
+    // import data from '../data/data-area.json?id=main-2'
+    // import data from '../data/data-scales'
     import TestStack from '../tests/testStack.js'
 
 
@@ -128,6 +128,10 @@
         //  Type in the console: stack.execAll()
         //  or: stack.exec('<group>')
 
+        document.querySelector('#chart-container').addEventListener('mousewheel', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+        })
     })
 
     function onClick(type) {
@@ -224,12 +228,10 @@
             <li on:click={() => redraw('redraw')}>redraw</li>
         </ul>
     </div>
-    <span style="margin-top: 100px;">
-        test
-        test
-        test
-    </span>
     <div id="chart-container">
+        <canvas id="heatmapCanvas"
+                style="position:absolute; top:0; left:0;"></canvas>
+
         <textarea id="canvas-drawing-tool-textarea" style="white-space: nowrap; position: absolute; z-index: 10; font: 14px sans-serif; display: none; resize: none; padding: 0; margin: 0; border: none; background: transparent; outline: none; color: white;"></textarea>
     </div>
 </div>

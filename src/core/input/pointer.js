@@ -1,8 +1,3 @@
-// Regular mouse/touch input. The object can be
-// attached to a renderer.
-// ~ Information flow ~
-// Input: mouse events / touch events
-// Output: internal events
 import debounce from 'lodash/debounce';
 import FrameAnimation from "../../stuff/frame.js";
 import Utils from "../../stuff/utils.js";
@@ -13,7 +8,6 @@ import MetaHub from "../metaHub.js";
 
 const soon = (function () {
     var c = [];
-
     function b() {
         while (c.length) {
             var d = c[0];
@@ -21,7 +15,6 @@ const soon = (function () {
             c.shift();
         }
     }
-
     var a = (function () {
         if (typeof MutationObserver !== "undefined") {
             var d = document.createElement("div");
@@ -49,28 +42,19 @@ const soon = (function () {
     };
 })();
 
-
 export default class Input {
 
     constructor() {
-        // ...
-        // Initialize an update needed flag
         this.rangeUpdateNeeded = false;
-        // Initialize range to be updated
         this.rangeToUpdate = null;
-
         this.debouncedMousedrag = soon.bind(this, debounce(this.mousedrag.bind(this), 5));
-        // Bind onTouch method to 'this'
-        // this.onTouch = this.onTouch.bind(this);
     }
 
-
     async setup(comp) {
+        this.ZOOM_SENS_X = comp.props.config.ZOOM_SENS;
+        this.ZOOM_SENS_Y = comp.props.config.ZOOM_SENS;
         this.MIN_ZOOM = comp.props.config.MIN_ZOOM;
         this.MAX_ZOOM = comp.props.config.MAX_ZOOM;
-
-        //  if (Utils.isMobile) this.MIN_ZOOM *= 0.5;
-
         this.canvas = comp.canvas;
         this.ctx = comp.ctx;
         this.props = comp.props;
@@ -78,13 +62,13 @@ export default class Input {
         this.rrId = comp.rrUpdId;
         this.gridUpdId = comp.gridUpdId;
         this.gridId = comp.id;
-        this.cursor = {}; // TODO: implement
-        this.oldMeta = {}; // TODO: implement
+        this.cursor = {};
+        this.oldMeta = {};
         this.range = this.props.range;
         this.interval = this.props.interval;
         this.offsetX = 0;
         this.offsetY = 0;
-        this.deltas = 0; // Wheel delta events
+        this.deltas = 0;
         this.wmode = this.props.config.SCROLL_WHEEL;
         this.lastZoomTime = 0;
 
@@ -99,7 +83,6 @@ export default class Input {
     mouseEvents(cmd) {
         ["mousemove", "mouseout", "mouseup", "mousedown", "click"].forEach((e) => {
             if (cmd === "addEventListener") {
-                // Save the handler to remove it later
                 this["_" + e] = this[e].bind(this);
             }
             this.canvas[cmd](e, this["_" + e]);
@@ -114,8 +97,7 @@ export default class Input {
         this.hm.wheel((event, delta) => this.mousezoom(-delta * 50, event));
 
         let mc = (this.mc = new Hammer.Manager(this.canvas));
-        // let T = Utils.isMobile ? 10 : 0;
-        let T = 0
+        let T = 0;
         mc.add(new Hammer.Pan({threshold: T}));
         mc.add(new Hammer.Tap());
         mc.add(new Hammer.Pinch({threshold: 0}));
@@ -123,7 +105,6 @@ export default class Input {
         if (Utils.isMobile) mc.add(new Hammer.Press());
 
         mc.on("panstart", (event) => {
-            // if (this.cursor.scroll_lock) return;
             if (this.cursor.mode === "aim") {
                 return this.emitCursorCoord(event);
             }
@@ -139,56 +120,40 @@ export default class Input {
                 B: this.layout.B,
                 t0: Utils.now(),
             };
-            // this.events.emit("cursor-locked", true);
             this.events.emit("cursor-changed", {
                 gridId: this.gridId,
                 x: event.center.x + this.offsetX,
                 y: event.center.y + this.offsetY,
             });
 
-            if (Utils.isMobile) {
-                this.calcOffset();
-                // this.propagate('mousedown', this.touch2mouse(event));
-            }
+            if (Utils.isMobile) this.calcOffset();
         });
 
         mc.on("panmove", (event) => {
             if (Utils.isMobile) {
-               this.calcOffset();
+                this.calcOffset();
                 this.events.emit('cursor-changed', {
                     gridId: this.gridId,
                     x: event.center.x + this.offsetX,
                     y: event.center.y + this.offsetY
                 })
-               this.propagate("mousemove", this.touch2mouse(event));
+                this.propagate("mousemove", this.touch2mouse(event));
             }
 
             if (this.drug) {
                 if (Utils.isMobile) {
                     this.handleMousedrag(this.drug.x + event.deltaX, this.drug.y + event.deltaY);
                 } else {
-                    this.mousedrag(
-                        this.drug.x + event.deltaX,
-                        this.drug.y + event.deltaY,
-                    )
+                    this.mousedrag(this.drug.x + event.deltaX, this.drug.y + event.deltaY);
                 }
-                /*this.events.emit('cursor-changed', {
-                            gridId: this.gridId,
-                            x: event.center.x + this.offsetX,
-                            y: event.center.y + this.offsetY
-                        })*/
             } else if (this.cursor.mode === "aim") {
                 this.emitCursorCoord(event);
             }
         });
 
         mc.on("panend", (event) => {
-            if (Utils.isMobile && this.drug) {
-               this.panFade(event);
-            }
+            if (Utils.isMobile && this.drug) this.panFade(event);
             this.drug = null;
-            //  this.events.emit("cursor-locked", false);
-
             if (Utils.isMobile) {
                 this.calcOffset();
                 this.propagate('mouseup', this.touch2mouse(event));
@@ -199,24 +164,22 @@ export default class Input {
             if (!Utils.isMobile) return;
             this.simMousedown(event);
             if (this.fade) this.fade.stop();
-            this.events.emit("cursor-changed", {});
-            this.events.emit("cursor-changed", {
-                mode: "explore",
-            });
+            this.events.emit("cursor-changed", { mode: "explore" });
             this.events.emitSpec(this.rrId, "update-rr");
         });
 
         mc.on("pinchstart", () => {
             this.drug = null;
+            let scaleId = this.layout.scaleIndex;
+            let tfrm = this.meta.getYtransform(this.gridId, scaleId);
             this.pinch = {
                 t: this.range[1] - this.range[0],
                 r: this.range.slice(),
+                y_r: tfrm && tfrm.range ? tfrm.range.slice() : null
             };
         });
 
-        mc.on("pinchend", () => {
-            this.pinch = null;
-        });
+        mc.on("pinchend", () => { this.pinch = null; });
 
         mc.on("pinch", (event) => {
             if (this.pinch) this.pinchZoom(event.scale);
@@ -231,24 +194,15 @@ export default class Input {
             this.simMousedown(event);
         });
 
-        // TODO: Add only once?
         let add = this.canvas.addEventListener;
         add("gesturestart", this.gesturestart);
         add("gesturechange", this.gesturechange);
         add("gestureend", this.gestureend);
     }
 
-    gesturestart(event) {
-        event.preventDefault();
-    }
-
-    gesturechange(event) {
-        event.preventDefault();
-    }
-
-    gestureend(event) {
-        event.preventDefault();
-    }
+    gesturestart(event) { event.preventDefault(); }
+    gesturechange(event) { event.preventDefault(); }
+    gestureend(event) { event.preventDefault(); }
 
     mousemove(event) {
         if (Utils.isMobile) return;
@@ -256,7 +210,7 @@ export default class Input {
             visible: true,
             gridId: this.gridId,
             x: event.layerX,
-            y: event.layerY - 1, // Align with the crosshair
+            y: event.layerY - 1,
         });
         this.calcOffset();
         this.propagate("mousemove", event);
@@ -282,65 +236,33 @@ export default class Input {
         this.events.emit("grid-mousedown", [this.gridId, event]);
     }
 
-    // Simulated mousedown (for mobile)
     simMousedown(event) {
         if (event.srcEvent.defaultPrevented) return;
         this.events.emit("grid-mousedown", [this.gridId, event]);
         this.propagate("mousemove", this.touch2mouse(event));
         this.events.emitSpec(this.rrId, "update-rr");
         this.propagate("mousedown", this.touch2mouse(event));
-        setTimeout(() => {
-            this.propagate("click", this.touch2mouse(event));
-        });
+        setTimeout(() => this.propagate("click", this.touch2mouse(event)));
     }
 
-    // Convert touch to "mouse" event
     touch2mouse(e) {
         this.calcOffset();
         return {
             original: e.srcEvent,
             layerX: e.center.x + this.offsetX,
             layerY: e.center.y + this.offsetY,
-            preventDefault: function () {
-                this.original.preventDefault();
-            },
+            preventDefault: function () { this.original.preventDefault(); },
         };
     }
 
-    click(event) {
-        this.propagate("click", event);
-    }
+    click(event) { this.propagate("click", event); }
 
     emitCursorCoord(event, add = {}) {
-        this.events.emit(
-            "cursor-changed",
-            Object.assign(
-                {
-                    gridId: this.gridId,
-                    x: event.center.x + this.offsetX,
-                    y: event.center.y + this.offsetY, //+ this.layout.offset
-                },
-                add
-            )
-        );
-    }
-
-    panFade(event) {
-        // let dt = Utils.now() - this.drug.t0;
-        // let dx = this.range[1] - this.drug.r[1];
-        // let v = (42 * dx) / dt;
-        // let v0 = Math.abs(v * 0.01);
-        // if (dt > 500) return;
-        // if (this.fade) this.fade.stop();
-        // this.fade = new FrameAnimation((self) => {
-        //     v *= 0.85;
-        //     if (Math.abs(v) < v0) {
-        //         self.stop();
-        //     }
-        //     this.range[0] += v;
-        //     this.range[1] += v;
-        //     this.changeRange();
-        // });
+        this.events.emit("cursor-changed", Object.assign({
+            gridId: this.gridId,
+            x: event.center.x + this.offsetX,
+            y: event.center.y + this.offsetY,
+        }, add));
     }
 
     calcOffset() {
@@ -356,11 +278,8 @@ export default class Input {
         if (now - this.lastZoomTime < 16) return;
         this.lastZoomTime = now;
 
-        // TODO: for mobile
         if (this.wmode !== "pass") {
-            if (this.wmode === "click" && !this.oldMeta.activated) {
-                return;
-            }
+            if (this.wmode === "click" && !this.oldMeta.activated) return;
             event.originalEvent.preventDefault();
             event.preventDefault();
         }
@@ -368,85 +287,75 @@ export default class Input {
         event.deltaX = event.deltaX || Utils.getDeltaX(event);
         event.deltaY = event.deltaY || Utils.getDeltaY(event);
 
-        let updated = false;
         if (Math.abs(event.deltaX) > 0) {
             this.trackpad = true;
-            if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) {
-                delta *= 0.1;
-            }
             this.trackpadScroll(event);
-            updated = true;
+            return;
         }
 
-        if (this.trackpad) delta *= 0.032;
-
-        
         delta = Utils.smartWheel(delta);
-
-        const dpr = window.devicePixelRatio ?? 1;
-        // TODO: mouse zooming is a little jerky,
-        // needs to follow f(mouse_wheel_speed) and
-        // if speed is low, scroll shoud be slower
         let data = this.hub.mainOv.dataSubset;
-        if (delta < 0 && data.length <= this.MIN_ZOOM) return;
-        if (delta > 0 && data.length > this.MAX_ZOOM) return;
+        const dpr = window.devicePixelRatio ?? 1;
+
+        // --- ZOOM X ---
         let k = this.interval / 1000;
-        let diff = delta * k * data.length;
-        
-        let tl = this.props.config.ZOOM_MODE === "tl";
-        if (event.originalEvent.ctrlKey || tl) {
+        let diffX = delta * k * data.length * this.ZOOM_SENS_X;
+
+        if (event.originalEvent.ctrlKey || this.props.config.ZOOM_MODE === "tl") {
             let offset = event.originalEvent.offsetX;
-            let diff1 = (offset / (this.canvas.width / dpr - 1)) * diff;
-            let diff2 = diff - diff1;
-            this.range[0] -= diff1;
-            this.range[1] += diff2;
+            let ratio = offset / (this.canvas.width / dpr - 1);
+            this.range[0] -= diffX * ratio;
+            this.range[1] += diffX * (1 - ratio);
         } else {
-            this.range[0] -= diff;
+            this.range[0] -= diffX;
+            this.range[1] += diffX; // Симметричный зум по умолчанию
         }
 
-        if (tl) {
-            let offset = event.originalEvent.offsetY;
-            let diff1 = (offset / (this.canvas.height / dpr - 1)) * 2;
-            let diff2 = 2 - diff1;
-            let z = diff / (this.range[1] - this.range[0]);
-            //rezoom_range(z, diff_x, diff_y)
-            // TODO: ?implement
-            this.events.emit("rezoom-range", {
+        // --- ZOOM Y ---
+        let scaleId = this.layout.scaleIndex;
+        let tfrm = this.meta.getYtransform(this.gridId, scaleId);
+        if (tfrm && tfrm.range) {
+            let yRange = tfrm.range.slice();
+            let yLen = yRange[1] - yRange[0];
+            // Используем множитель для плавности (exp-подобный зум)
+            let factor = 1 + (delta * 0.001 * this.ZOOM_SENS_Y);
+
+            let newYRange = [
+                yRange[0] + (yLen * (1 - factor)) * 0.5,
+                yRange[1] - (yLen * (1 - factor)) * 0.5
+            ];
+
+            this.events.emit('sidebar-transform', {
                 gridId: this.gridId,
-                z,
-                diff1,
-                diff2,
+                scaleId: scaleId,
+                range: newYRange,
+                auto: false // Выключаем авто-шкалу при ручном зуме
             });
         }
-        // TODO: fix doulbe updates (only on120hz macbook)
-        /*if (!updated)*/
+
         this.changeRange();
     }
 
     mousedrag(x, y) {
+        if (this.meta.scrollLock || !this.drug) return;
 
-        if (this.meta.scrollLock || !this.drug) return
+        let dt = this.drug.t * (this.drug.x - x) / this.layout.width;
+        let d$ = this.layout.$hi - this.layout.$lo;
+        d$ *= (this.drug.y - y) / this.layout.height;
+        let offset = this.drug.o + d$;
+        let ls = this.layout.settings.logScale;
 
-        let dt = this.drug.t * (this.drug.x - x) / this.layout.width
-        let d$ = this.layout.$hi - this.layout.$lo
-        d$ *= (this.drug.y - y) / this.layout.height
-        let offset = this.drug.o + d$
-        let ls = this.layout.settings.logScale
-
+        let range;
         if (ls && this.drug.y_r) {
-            let dy = this.drug.y - y
-            var range = this.drug.y_r.slice()
-            range[0] = math.exp((0 - this.drug.B + dy) /
-                this.layout.A)
-            range[1] = math.exp(
-                (this.layout.height - this.drug.B + dy) /
-                this.layout.A)
+            let dy = this.drug.y - y;
+            range = this.drug.y_r.slice();
+            range[0] = math.exp((0 - this.drug.B + dy) / this.layout.A);
+            range[1] = math.exp((this.layout.height - this.drug.B + dy) / this.layout.A);
         }
 
-        let scaleId = this.layout.scaleIndex
-        let yTransform = this.meta.getYtransform(this.gridId, scaleId)
-        if (this.drug.y_r && yTransform &&
-            !yTransform.auto) {
+        let scaleId = this.layout.scaleIndex;
+        let yTransform = this.meta.getYtransform(this.gridId, scaleId);
+        if (this.drug.y_r && yTransform && !yTransform.auto) {
             this.events.emit('sidebar-transform', {
                 gridId: this.gridId,
                 scaleId: scaleId,
@@ -454,44 +363,52 @@ export default class Input {
                     this.drug.y_r[0] - offset,
                     this.drug.y_r[1] - offset,
                 ]
-            })
+            });
         }
 
-        this.range[0] = this.drug.r[0] + dt
-        this.range[1] = this.drug.r[1] + dt
+        this.range[0] = this.drug.r[0] + dt;
+        this.range[1] = this.drug.r[1] + dt;
 
         requestAnimationFrame(() => this.changeRange());
     }
 
-    handleMousedrag(x, y) {
-        this.debouncedMousedrag(x, y);
-    }
+    handleMousedrag(x, y) { this.debouncedMousedrag(x, y); }
 
     pinchZoom(scale) {
-        if (this.meta.scrollLock) return;
+        if (this.meta.scrollLock || !this.pinch) return;
 
-        let data = this.hub.mainOv.dataSubset;
-
-        if (scale > 1 && data.length <= this.MIN_ZOOM) return;
-        if (scale < 1 && data.length > this.MAX_ZOOM) return;
-
+        // --- ZOOM X ---
         let t = this.pinch.t;
-        let nt = (t * 1) / scale;
-
+        let nt = t / scale;
         this.range[0] = this.pinch.r[0] - (nt - t) * 0.5;
         this.range[1] = this.pinch.r[1] + (nt - t) * 0.5;
+
+        // --- ZOOM Y ---
+        let scaleId = this.layout.scaleIndex;
+        if (this.pinch.y_r) {
+            let yR = this.pinch.y_r;
+            let yLen = yR[1] - yR[0];
+            let nyLen = yLen / scale;
+
+            this.events.emit('sidebar-transform', {
+                gridId: this.gridId,
+                scaleId: scaleId,
+                range: [
+                    yR[0] - (nyLen - yLen) * 0.5,
+                    yR[1] + (nyLen - yLen) * 0.5
+                ],
+                auto: false
+            });
+        }
 
         this.changeRange();
     }
 
-    trackpadScroll(event) {        
+    trackpadScroll(event) {
         if (this.meta.scrollLock) return;
-
         let dt = this.range[1] - this.range[0];
-
         this.range[0] += event.deltaX * dt * 0.011;
         this.range[1] += event.deltaX * dt * 0.011;
-
         this.changeRange();
     }
 
@@ -506,49 +423,30 @@ export default class Input {
         let minRange = layout.ti(data[l][0], l) - this.interval * 5.5;
         let maxRange = layout.ti(data[0][0], 0) + this.interval * 5.5;
 
-        // Prevent scaling down at the ends of the data
         if ((range[0] <= minRange && range[1] <= maxRange) || (range[0] >= minRange && range[1] >= maxRange)) {
-            return;
+            return; // Можно разблокировать, если нужно жесткое ограничение
         }
 
-        range[0] = Utils.clamp(range[0], -Infinity, minRange);
-        range[1] = Utils.clamp(range[1], maxRange, Infinity);
-
-
-        // Set update needed flag and store the range
         this.rangeUpdateNeeded = true;
         this.rangeToUpdate = range;
 
-        // Request an animation frame if one has not already been requested
         if (!this.frameRequested) {
             this.frameRequested = true;
             requestAnimationFrame(() => this.emitRangeChange());
         }
-
     }
 
     emitRangeChange() {
-        // Check if an update is needed
         if (this.rangeUpdateNeeded) {
-            // Emit the 'range-changed' event
             this.events.emit("range-changed", this.rangeToUpdate);
-
-            // Reset the flags
             this.rangeUpdateNeeded = false;
             this.rangeToUpdate = null;
         }
-
-        // Reset the frame requested flag
         this.frameRequested = false;
     }
 
-
-    // Propagate mouse event to overlays
     propagate(name, event) {
-        this.events.emitSpec(this.gridUpdId, "propagate", {
-            name,
-            event,
-        });
+        this.events.emitSpec(this.gridUpdId, "propagate", { name, event });
     }
 
     destroy() {

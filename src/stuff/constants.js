@@ -33,7 +33,7 @@ const $SCALES = [0.05, 0.1, 0.2, 0.25, 0.5, 0.8, 1, 2, 5]
 // Default colors
 const COLORS = {
     back: '#14151c', // Background color
-    grid: '#252732', // Grid color
+    grid: 'transparent', // Grid color
     text: '#adadad', // Regular text color
     textHL: '#dedddd', // Highlighted text color
     textLG: '#c4c4c4', // Legend text color
@@ -85,7 +85,8 @@ const ChartConfig = {
     QUANTIZE_AFTER: 0, // Quantize cursor after, ms
     AUTO_PRE_SAMPLE: 10, // Sample size for auto-precision
     CANDLE_TIME: true, // Show remaining candle time
-    DOUBLE_CLICK_ALERT: false
+    DOUBLE_CLICK_ALERT: false,
+    ZOOM_SENS: 0.4
 }
 
 ChartConfig.FONT =

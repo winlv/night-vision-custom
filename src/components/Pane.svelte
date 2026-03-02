@@ -9,6 +9,7 @@ import SidebarStub from './SidebarStub.svelte'
 import Legend from './Legend.svelte'
 import Events from '../core/events.js'
 import Utils from '../stuff/utils.js'
+import Resizer from "./Resizer.svelte";
 
 export let id // Pane id
 export let props // General props

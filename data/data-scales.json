@@ -2,12 +2,6 @@
     "panes": [
         {
             "settings": {
-                "scaleTemplate": [[], ["A"]],
-                "scales": {
-                    "A": {
-                        "precision": 2
-                    }
-                }
             },
             "overlays": [
                 {
@@ -16827,7 +16821,7 @@
         },
         {
             "settings": {
-                "scaleTemplate": [[], ["A", "B"]]
+              "height": 0.2
             },
             "overlays": [
                 {

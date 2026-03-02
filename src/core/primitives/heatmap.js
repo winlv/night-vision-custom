@@ -1,162 +1,231 @@
-import Layer from "../layer.js";
 import * as PIXI from 'pixi.js';
 import Events from "../events.js";
 import MetaHub from "../metaHub.js";
-import Utils from "../../stuff/utils.js";
+
+const VERTEX_SHADER = `
+    attribute vec2 aVertexPosition; 
+    attribute vec2 aInstancePos;  
+    attribute vec2 aInstanceSize; 
+    attribute vec4 aInstanceColor;
+
+    uniform mat3 translationMatrix;
+    uniform mat3 projectionMatrix;
+
+    varying vec4 vColor;
+
+    void main() {
+        vColor = aInstanceColor;
+        vec3 finalPos = translationMatrix * vec3(aVertexPosition * aInstanceSize + aInstancePos, 1.0);
+        gl_Position = vec4((projectionMatrix * finalPos).xy, 0.0, 1.0);
+    }
+`;
+
+const FRAGMENT_SHADER = `
+    precision mediump float;
+    varying vec4 vColor;
+    void main() {
+        gl_FragColor = vec4(vColor.rgb * vColor.a, vColor.a);
+    }
+`;
+
+const EXCHANGES_CONFIG = {
+    'bi-s': 'BINANCE_SPOT',
+    'bi-f': 'BINANCE_FUTURES',
+    'by-s': 'BYBIT_SPOT',
+    'by-f': 'BYBIT_FUTURES',
+    'okx-s': 'OKX_SPOT',
+    'okx-f': 'OKX_FUTURES',
+    'mexc-s': 'MEXC_SPOT',
+    'mexc-f': 'MEXC_FUTURES',
+    'gate-s': 'GATE_SPOT',
+    'gate-f': 'GATE_FUTURES',
+    'bit-s': 'BITGET_SPOT',
+    'bit-f': 'BITGET_FUTURES'
+};
 
 export default class Heatmap {
     heatmapApp = undefined;
-    prevYRange = undefined;
-    prevChartRange = undefined;
-    prevXScale = 1;
-    prevYScale = 1;
-    xInitialScale = undefined;
-    yInitialScale = undefined;
-    initialWidth = 0;
-    initialHeight = 0;
-    props = undefined;
+    instancedMesh = undefined;
+    instanceBuffer = undefined;
+
+    MAX_INSTANCES = 300000;
+    STRIDE = 8;
 
     constructor(id) {
         this.nvId = id;
-
         this.events = Events.instance(this.nvId);
         this.meta = MetaHub.instance(this.nvId);
 
         this.events.on(`heatmap-layer:layout-update`, this.layoutUpdate.bind(this));
 
-        this.zIndex = 1000000;
-        this.ctxType = 'Canvas';
-
         this.heatmapApp = new PIXI.Application({
             backgroundAlpha: 0,
-            clearBeforeRender: true,
-            antialias: !Utils.isMobile,
-            autoDensity: !Utils.isMobile,
+            antialias: true,
+            autoDensity: true,
             resizeTo: window,
             resolution: window.devicePixelRatio || 1,
         });
 
         this.heatmapApp.view.style.position = 'absolute';
-        this.heatmapApp.view.style.top = 0;
-        this.heatmapApp.view.style.left = 0;
+        this.heatmapApp.view.style.top = '0';
+        this.heatmapApp.view.style.left = '0';
         this.heatmapApp.view.style.pointerEvents = 'none';
         this.heatmapApp.view.classList.add('orderbook-heatmap');
 
+        this.PALETTE_SIZE = 256;
+        this.askPalette = new Float32Array(this.PALETTE_SIZE * 4);
+        this.bidPalette = new Float32Array(this.PALETTE_SIZE * 4);
+        this.palettes = {
+            asks: new Map(),
+            bids: new Map()
+        };
+        this.maxVolumes = new Map();
+        this.lastScales = { asks: '', bids: '' };
+
         window.PIXI = PIXI;
 
-        this.meta.hub.se.chart.root.addEventListener('contextmenu', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-        });
+        this.initInstancedMesh();
 
+        // hz
         this.meta.hub.se.chart.root.appendChild(this.heatmapApp.view);
+        this.meta.heatmap = this;
     }
 
-    layoutUpdate({layout, props} = data) {
-        if (!layout.main) {
-            return void 0;
-        }
+    initInstancedMesh() {
+        const geometry = new PIXI.Geometry()
+            .addAttribute('aVertexPosition', [0,0, 1,0, 1,1, 0,1], 2)
+            .addIndex([0, 1, 2, 0, 2, 3]);
 
-        if (!this.heatmapApp) {
-            return void 0;
-        }
+        this.instanceBuffer = new Float32Array(this.MAX_INSTANCES * this.STRIDE);
 
-        if (!this.layout) {
-            this.layout = layout;
-        }
+        this.gpuBuffer = new PIXI.Buffer(this.instanceBuffer, false, false);
 
-        if (!this.props) {
-            this.props = props;
-        }
+        geometry.addAttribute('aInstancePos', this.gpuBuffer, 2, false, PIXI.TYPES.FLOAT, 32, 0, true);
+        geometry.addAttribute('aInstanceSize', this.gpuBuffer, 2, false, PIXI.TYPES.FLOAT, 32, 8, true);
+        geometry.addAttribute('aInstanceColor', this.gpuBuffer, 4, false, PIXI.TYPES.FLOAT, 32, 16, true);
 
-        if (!this.prevYRange) {
-            this.prevYRange = [this.layout.$hi, this.layout.$lo];
-            this.prevChartRange = [...this.props.range];
-            return void 0;
-        }
+        const shader = PIXI.Shader.from(VERTEX_SHADER, FRAGMENT_SHADER);
+        this.instancedMesh = new PIXI.Mesh(geometry, shader, null, PIXI.DRAW_MODES.TRIANGLES);
 
-        if (!this.xInitialScale) {
-            this.xInitialScale = 1 / (this.props.range[1] - this.props.range[0]);
-        }
+        this.instancedMesh.state.blendMode = PIXI.BLEND_MODES.NORMAL;
+        // hz
+        this.instancedMesh.geometry.instanceCount = 0;
 
-        if (!this.yInitialScale) {
-            this.yInitialScale = 1 / (this.layout.$hi - this.layout.$lo);
-        }
-
-        if (!this.initialWidth) {
-            this.initialWidth = this.layout.width;
-        }
-
-        if (!this.initialHeight) {
-            this.initialHeight = this.layout.height;
-        }
-
-        // Calculate x
-        const prevPosX = this.layout.ti2xWithoutRound(this.prevChartRange[0]);
-        const crntPosX = this.layout.ti2xWithoutRound(props.range[0]);
-        const offsetX = prevPosX - crntPosX;
-        let x = this.heatmapApp.stage.position.x + offsetX;
-
-        // Calculate y
-        let offsetY = 0;
-        let scaleId = this.layout.scaleIndex
-        const gridId = this.layout.main ? this.layout.id : this.layout.mainGrid.id;
-        let yTransform = this.meta.getYtransform(gridId, scaleId);
-        if (yTransform?.range) {
-            const prevPosY = this.layout.value2y(this.prevYRange[0], false);
-            const crntPosY = this.layout.value2y(yTransform.range[0], false);
-            offsetY = prevPosY - crntPosY;
-        }
-        let y = this.heatmapApp.stage.position.y + offsetY;
-
-        // Calculate x scale
-        let zoomX = 1 / (this.xInitialScale * (props.range[1] - props.range[0]));
-        if (this.initialWidth !== this.layout.width) {
-            zoomX = zoomX * (this.layout.width / this.initialWidth);
-        }
-        x = x * (zoomX / this.prevXScale);
-
-        // Calculate y scale
-        let zoomY = yTransform?.zoom ?? 1;
-        if (this.initialHeight !== this.layout.height) {
-            zoomY = zoomY * (this.layout.height / this.initialHeight);
-        }
-        y = y * (zoomY / this.prevYScale);
-        if (zoomY === 1) {
-            y = 0;
-        }
-
-        this.heatmapApp.stage.position.set(x,y);
-        this.heatmapApp.stage.scale.set(zoomX, zoomY);
-
-        this.prevYRange = [layout.$hi, layout.$lo];
-        this.prevChartRange = [...props.range];
-        this.prevXScale = zoomX;
-        this.prevYScale = zoomY;
-
-        this.layout = layout;
-        this.props = props;
+        this.heatmapApp.stage.addChild(this.instancedMesh);
     }
 
-    reset() {
-        this.layout = undefined;
-        this.props = undefined;
-        this.initialHeight = undefined;
-        this.initialWidth = undefined;
-        this.xInitialScale = undefined;
-        this.yInitialScale = undefined;
-        this.prevXScale = 1;
-        this.prevYScale = 1;
-        this.prevYRange = undefined;
-        this.prevChartRange = undefined;
+    updatePalettes(colorScaleAsks, colorScaleBids, maxVolumesMap) {
+        const cacheKey = JSON.stringify(maxVolumesMap);
+        if (this.lastScales.asks === cacheKey) return;
+
+        console.log(maxVolumesMap);
+
+        this.palettes = { asks: {}, bids: {} };
+
+        for (const [exName, maxVol] of Object.entries(maxVolumesMap)) {
+            const askPal = new Float32Array(this.PALETTE_SIZE * 4);
+            const bidPal = new Float32Array(this.PALETTE_SIZE * 4);
+
+            for (let i = 0; i < this.PALETTE_SIZE; i++) {
+                const val = i * (maxVol / (this.PALETTE_SIZE - 1));
+
+                const askCol = this.parseColor(colorScaleAsks[exName](val));
+                const bidCol = this.parseColor(colorScaleBids[exName](val));
+
+                const off = i * 4;
+                askPal[off] = askCol.r; askPal[off+1] = askCol.g;
+                askPal[off+2] = askCol.b; askPal[off+3] = askCol.a;
+
+                bidPal[off] = bidCol.r; bidPal[off+1] = bidCol.g;
+                bidPal[off+2] = bidCol.b; bidPal[off+3] = bidCol.a;
+            }
+
+            this.palettes.asks[exName] = askPal;
+            this.palettes.bids[exName] = bidPal;
+        }
+
+        this.lastScales.asks = cacheKey;
     }
 
+    updateData(data, layout, props, colorScaleAsks, colorScaleBids, aggStep, exchange, maxVolumesMap) {
+        if (!this.instancedMesh || !data.length) return;
+
+        this.updatePalettes(colorScaleAsks, colorScaleBids, maxVolumesMap);
+
+        let idx = 0;
+        const cellWidth = layout.pxStep;
+        const step = aggStep || (1 / Math.pow(10, layout.prec));
+        const cellHeight = Math.max(Math.abs(layout.value2y(0, false) - layout.value2y(step, false)), 0.5);
+
+        for (let i = 0; i < data.length; i++) {
+            const [timestamp, levels] = data[i];
+            const x = layout.ti2xWithoutRound(timestamp) - cellWidth / 2;
+            if (x + cellWidth < 0 || x > layout.width) continue;
+
+            const renderSide = (orders, type) => {
+                for (let j = 0; j < orders.length; j += 3) {
+                    if (idx + 8 >= this.instanceBuffer.length) break;
+
+                    const price = orders[j];
+                    const qty = orders[j+1];
+                    const exId = orders[j+2]; // 'bi-f', 'bi-s' и т.д.
+
+                    const exName = EXCHANGES_CONFIG[exId];
+                    const maxVol = maxVolumesMap[exName] || 100000;
+                    const palette = this.palettes[type][exName];
+
+                    if (!palette) continue;
+
+                    const val = price * qty;
+                    const intensity = Math.min(val / maxVol, 1.0);
+                    const pIdx = (intensity * (this.PALETTE_SIZE - 1)) | 0;
+                    const pOff = pIdx * 4;
+
+                    const y = layout.value2y(price + step, false);
+
+                    this.instanceBuffer[idx]     = x;
+                    this.instanceBuffer[idx + 1] = y;
+                    this.instanceBuffer[idx + 2] = cellWidth;
+                    this.instanceBuffer[idx + 3] = cellHeight;
+                    this.instanceBuffer[idx + 4] = palette[pOff];
+                    this.instanceBuffer[idx + 5] = palette[pOff + 1];
+                    this.instanceBuffer[idx + 6] = palette[pOff + 2];
+                    this.instanceBuffer[idx + 7] = palette[pOff + 3];
+                    idx += 8;
+                }
+            };
+
+            if (levels.a) renderSide(levels.a, 'asks');
+            if (levels.b) renderSide(levels.b, 'bids');
+        }
+
+        this.instancedMesh.geometry.instanceCount = idx / 8;
+        this.gpuBuffer.update(this.instanceBuffer);
+    }
+
+    // hz
+    layoutUpdate({layout, props}) {
+        if (!layout.main || !this.heatmapApp) return;
+        this.heatmapApp.stage.position.set(0, 0);
+        this.heatmapApp.stage.scale.set(1, 1);
+    }
+
+    // get rid of this shit
+    parseColor(colorStr) {
+        if (colorStr[0] === '#') {
+            const hex = parseInt(colorStr.substring(1), 16);
+            return { r: ((hex >> 16) & 255) / 255, g: ((hex >> 8) & 255) / 255, b: (hex & 255) / 255, a: 1 };
+        }
+        const m = colorStr.match(/[\d\.]+/g);
+        if (m) return { r: m[0]/255, g: m[1]/255, b: m[2]/255, a: parseFloat(m[3] || 1) };
+        return { r: 1, g: 1, b: 1, a: 1 };
+    }
+
+    // hz
     destroy() {
         this.events.off('heatmap-layer');
-        this.heatmapApp.stop();
-        this.heatmapApp.stage.destroy({children: true, texture: true, baseTexture: true});
-        this.heatmapApp.view.remove();
-        this.heatmapApp.destroy(true);
-        this.heatmapApp = undefined;
+        if (this.heatmapApp) {
+            this.heatmapApp.destroy(true, { children: true, texture: true, baseTexture: true });
+        }
     }
 }

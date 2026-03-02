@@ -1,446 +1,348 @@
-// NavyJS ~ 0.2-lite
-
-// <ds>Heatmap</ds>, format:
-// [<timestamp>, <open>, <high>, <low>, <close>, <?volume>]
-
-
 [OVERLAY name = Heatmap, ctx = Canvas, version = 1.0.0]
 
-prop('colorScaleAsks', {type: 'string', def: (value) => gradient(value, 'asks')(value)});
-prop('colorScaleBids', {type: 'string', def: (value) => gradient(value, 'bids')(value)});
+prop('colorScaleAsks', {type: 'string', def: {'BINANCE_FUTURES': (value) => gradient(value, 'asks')(value)}});
+prop('colorScaleBids', {type: 'string', def: {'BINANCE_FUTURES': (value) => gradient(value, 'bids')(value)}});
 
-let redraw = false;
-let hoveredLimitOrder = {x: 0, y: 0};
-let hoveredYAskValue;
-let hoveredYBidValue;
-let hoveredTimestamp;
+prop('showLabels',     { type: 'boolean', def: true });
+prop('aggregationStep', { type: 'number', def: 0 });
+
 let cellHeightStep = 0;
-let fullLimitOrder = true;
-let redrawCount = 0;
-let drawnElements = 0;
-let initialCellWidth = 0;
 
-init() {
-    redraw = true;
+let _asksScale = null;
+let _bidsScale = null;
+let _compactFmt = null;
+const SPOOF_VOLUME_MIN = 300000;
+const QTY_TOLERANCE = 0.1;
+
+let processedData;
+
+const _volFmt = new Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 1
+});
+let maxVolumesMap = {};
+
+const EXCHANGES_CONFIG = {
+    'bi-s': 'BINANCE_SPOT',
+    'bi-f': 'BINANCE_FUTURES',
+    'by-s': 'BYBIT_SPOT',
+    'by-f': 'BYBIT_FUTURES',
+    'okx-s': 'OKX_SPOT',
+    'okx-f': 'OKX_FUTURES',
+    'mexc-s': 'MEXC_SPOT',
+    'mexc-f': 'MEXC_FUTURES',
+    'gate-s': 'GATE_SPOT',
+    'gate-f': 'GATE_FUTURES',
+    'bit-s': 'BITGET_SPOT',
+    'bit-f': 'BITGET_FUTURES'
+};
+
+function init() {
+    _compactFmt = new Intl.NumberFormat('en', { notation: 'compact' });
 }
 
-draw(ctx)
-{
-    if (!$core.meta.heatmap) {
-        return void 0;
+function draw(ctx) {
+    if (!$core.meta?.heatmap) return;
+
+    const flags = window?.[$core.props.id] || {};
+
+    if (flags.redraw === undefined) {
+        flags.redraw = true;
     }
 
-    if (redraw) {
-        drawHeatmap();
-    } else {
-        handleHoveredLimitOrders(ctx);
-        drawHoveredLimitOrders(ctx);
+    if (flags.redraw || flags.redrawNew || flags.redrawLast || flags.drawMore) {
+        const data = $core.data;
+        const step = $props.aggregationStep;
+
+        processedData = data.map(row => {
+            const ts = row[0];
+            const levels = row[1];
+
+            const aggA = step > 0 ? aggregateLevels(levels.a, step) : levels.a;
+            const aggB = step > 0 ? aggregateLevels(levels.b, step) : levels.b;
+
+            const findMax = (levs) => {
+                for (let k = 0; k < levs.length; k += 3) {
+                    const price = levs[k];
+                    const qty = levs[k+1];
+                    const exId = levs[k+2];
+
+                    const exName = EXCHANGES_CONFIG[exId] || 'UNKNOWN';
+                    const v = price * qty;
+
+                    if (!maxVolumesMap[exName] || v > maxVolumesMap[exName]) {
+                        maxVolumesMap[exName] = v;
+                    }
+                }
+            }
+            const x = $core.layout.ti2xWithoutRound(ts);
+            if (x >= 0 && x <= $core.layout.width) {
+                findMax(aggA);
+                findMax(aggB);
+            }
+
+            return [ts, { a: aggA, b: aggB }];
+        });
+
+        calculateSpoofing(processedData);
+        clearFlags(flags);
     }
 
-    // if (window.drawMore) {
-    //     drawMore();
-    // }
-    //
-    // if (window.redrawLast) {
-    //     redrawLast();
-    // }
-    //
-    // if (window.redrawNew) {
-    //     redrawNew();
-    // }
+    updateGPUData();
+    drawVolumeLabels(ctx);
+    drawSpoofingLines(ctx);
 }
 
-function redrawNew() {
-    window.redrawNew = false;
+function calculateSpoofing(data) {
+    spoofingLines = [];
+    if (data.length < 2) return;
 
-    if (!$core.meta.heatmap) {
-        return void 0;
+    for (let i = 1; i < data.length; i++) {
+        const prevLevels = data[i-1][1];
+        const currLevels = data[i][1];
+        const tsPrev = data[i-1][0];
+        const tsCurr = data[i][0];
+
+        const findMoves = (sidePrev, sideCurr) => {
+            if (!sidePrev || !sideCurr) return;
+
+            for (let j = 0; j < sidePrev.length; j += 3) {
+                const pPrev = sidePrev[j];
+                const qPrev = sidePrev[j+1];
+                const vPrev = pPrev * qPrev;
+
+                if (vPrev < SPOOF_VOLUME_MIN) continue;
+
+                const stillThere = sideCurr.some((p, idx) => idx % 3 === 0 && p === pPrev);
+
+                if (!stillThere) {
+                    for (let k = 0; k < sideCurr.length; k += 3) {
+                        const pCurr = sideCurr[k];
+                        const qCurr = sideCurr[k+1];
+                        const vCurr = pCurr * qCurr;
+
+                        const isSimilarQty = Math.abs(vCurr - vPrev) / vPrev < QTY_TOLERANCE;
+
+                        if (pCurr !== pPrev && isSimilarQty) {
+                            spoofingLines.push({
+                                x1: tsPrev,
+                                y1: pPrev,
+                                x2: tsCurr,
+                                y2: pCurr,
+                                side: sidePrev === prevLevels.a ? 'ask' : 'bid'
+                            });
+                            break;
+                        }
+                    }
+                }
+            }
+        };
+
+        findMoves(prevLevels.a, currLevels.a);
+        findMoves(prevLevels.b, currLevels.b);
     }
+}
 
-    let obj = new PIXI.Graphics();
+function drawSpoofingLines(ctx) {
 
-    const data = $core.data;
     const layout = $core.layout;
+    const step = $props.aggregationStep || (1 / Math.pow(10, layout.prec));
 
-    const step = layout.$step;
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
 
-    const y1 = layout.value2y(0, false);
-    const y2 = layout.value2y(step, false);
-    const yStepRange = y1 - y2;
-    const yOffset = step * Math.pow(10, layout.prec);
-    let cellHeight = yStepRange / yOffset / $core.meta.heatmap.heatmapApp.stage.scale.y;
-    cellHeight = Math.max(cellHeight, 2); // Ensure cellHeight is at least 2
+    for (const line of spoofingLines) {
+        const x1 = layout.ti2xWithoutRound(line.x1);
+        const x2 = layout.ti2xWithoutRound(line.x2);
 
-    const lastElementData = data[data.length - 1];
+        const y1 = layout.value2y(line.y1 + step / 2);
+        const y2 = layout.value2y(line.y2 + step / 2);
 
-    const lastStageChild = $core.meta.heatmap.heatmapApp.stage.children[$core.meta.heatmap.heatmapApp.stage.children.length - 1];
-    const cellWidth = lastStageChild.geometry.graphicsData[0].shape.width;
-    const xPos = lastStageChild.geometry.graphicsData[0].shape.x + cellWidth;
+        if (x2 < 0 || x1 > layout.width) continue;
 
-    const asks = lastElementData[1].a;
-    const bids = lastElementData[1].b;
-
-    for (let j = 0; j < asks.length; j += 2) {
-        const price = asks[j];
-        const quantity = asks[j + 1];
-        const y = (layout.value2y(price, false) - $core.meta.heatmap.heatmapApp.stage.position.y) / $core.meta.heatmap.heatmapApp.stage.scale.y;
-        obj.beginFill($props.colorScaleAsks(price * quantity));
-        obj.drawRect(xPos, y, cellWidth, cellHeight);
+        ctx.beginPath();
+        ctx.strokeStyle = line.side === 'ask' ? '#ff4d4d' : '#00ff80';
+        ctx.globalAlpha = 0.6;
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
     }
-
-    for (let j = 0; j < bids.length; j += 2) {
-        const price = bids[j];
-        const quantity = bids[j + 1];
-        const y = (layout.value2y(price, false) - $core.meta.heatmap.heatmapApp.stage.position.y) / $core.meta.heatmap.heatmapApp.stage.scale.y;
-        obj.beginFill($props.colorScaleBids(price * quantity));
-        obj.drawRect(xPos, y, cellWidth, cellHeight);
-    }
-
-    drawnElements = data.length;
-    $core.meta.heatmap.heatmapApp.stage.addChild(obj);
+    ctx.restore();
 }
 
-function redrawLast() {
-    window.redrawLast = false;
-
-    if (!$core.meta.heatmap) {
-        return void 0;
-    }
-
-    const data = $core.data;
+function drawVolumeLabels(ctx) {
     const layout = $core.layout;
-
-
-    const step = layout.$step;
-
-    const y1 = layout.value2y(0, false);
-    const y2 = layout.value2y(step, false);
-    const yStepRange = y1 - y2;
-    const yOffset = step * Math.pow(10, layout.prec);
-    let cellHeight = yStepRange / yOffset / $core.meta.heatmap.heatmapApp.stage.scale.y;
-    cellHeight = Math.max(cellHeight, 2); // Ensure cellHeight is at least 2
-
-    const lastElementData = data[data.length - 1];
-    const lastStageChild = $core.meta.heatmap.heatmapApp.stage.children[$core.meta.heatmap.heatmapApp.stage.children.length - 1];
-    const xPos = lastStageChild.geometry.graphicsData[0].shape.x;
-    const cellWidth = lastStageChild.geometry.graphicsData[0].shape.width;
-    lastStageChild.destroy();
-    $core.meta.heatmap.heatmapApp.stage.removeChild(lastStageChild);
-
-    const asks = lastElementData[1].a;
-    const bids = lastElementData[1].b;
-
-    let obj = new PIXI.Graphics();
-
-    for (let j = 0; j < asks.length; j += 2) {
-        const price = asks[j];
-        const quantity = asks[j + 1];
-        const y = (layout.value2y(price, false) - $core.meta.heatmap.heatmapApp.stage.position.y) / $core.meta.heatmap.heatmapApp.stage.scale.y;
-        obj.beginFill($props.colorScaleAsks(price * quantity));
-        obj.drawRect(xPos, y, cellWidth, cellHeight);
-    }
-
-    for (let j = 0; j < bids.length; j += 2) {
-        const price = bids[j];
-        const quantity = bids[j + 1];
-        const y = (layout.value2y(price, false) - $core.meta.heatmap.heatmapApp.stage.position.y) / $core.meta.heatmap.heatmapApp.stage.scale.y;
-        obj.beginFill($props.colorScaleBids(price * quantity));
-        obj.drawRect(xPos, y, cellWidth, cellHeight);
-    }
-
-    $core.meta.heatmap.heatmapApp.stage.addChild(obj);
-}
-
-function drawMore() {
-    window.drawMore = false;
-
-    if (!$core.meta.heatmap) {
-        return void 0;
-    }
-
-    const data = $core.data;
-    const layout = $core.layout;
-
-    const step = layout.$step;
-
-    const y1 = layout.value2y(0, false);
-    const y2 = layout.value2y(step, false);
-    const yStepRange = y1 - y2;
-    const yOffset = step * Math.pow(10, layout.prec);
-    let cellHeight = yStepRange / yOffset / $core.meta.heatmap.heatmapApp.stage.scale.y;
-    cellHeight = Math.max(cellHeight, 2); // Ensure cellHeight is at least 2
-
-    const startIdx = drawnElements;
-    drawnElements = data.length;
-
-    const stageChild = $core.meta.heatmap.heatmapApp.stage.children[0];
-    const cellWidth = stageChild.geometry.graphicsData[0].shape.width;
-
-    for (let i = startIdx, n = data.length - 1; i <= n; i++) {
-        let obj = new PIXI.Graphics();
-
-        const timestamp = data[i][0];
-        const x = (layout.ti2xWithoutRound(timestamp) - $core.meta.heatmap.heatmapApp.stage.position.x) / $core.meta.heatmap.heatmapApp.stage.scale.x;
-        let currentPrice = 0;
-
-        try {
-            currentPrice = $core.hub.mainOv.data[i - 1][4] ?? 0;
-        } catch (e) {
-            // Handle exceptions if necessary
-        }
-
-        const asks = data[i][1].a;
-        const bids = data[i][1].b;
-
-        for (let j = 0; j < asks.length; j += 2) {
-            const price = asks[j];
-            const quantity = asks[j + 1];
-            const y = (layout.value2y(price, false) - $core.meta.heatmap.heatmapApp.stage.position.y) / $core.meta.heatmap.heatmapApp.stage.scale.y;
-            obj.beginFill($props.colorScaleAsks(price * quantity));
-            obj.drawRect(x - (cellWidth / 2), y, cellWidth, cellHeight);
-        }
-
-        for (let j = 0; j < bids.length; j += 2) {
-            const price = bids[j];
-            const quantity = bids[j + 1];
-            const y = (layout.value2y(price, false) - $core.meta.heatmap.heatmapApp.stage.position.y) / $core.meta.heatmap.heatmapApp.stage.scale.y;
-            obj.beginFill($props.colorScaleBids(price * quantity));
-            obj.drawRect(x - (cellWidth / 2), y, cellWidth, cellHeight);
-        }
-
-        $core.meta.heatmap.heatmapApp.stage.addChildAt(obj, 0);
-    }
-}
-
-function drawHeatmap() {
-    if (!$core.meta.heatmap) {
-        return void 0;
-    }
-
-    for (const child of $core.meta.heatmap.heatmapApp.stage.children) {
-        child.destroy();
-        $core.meta.heatmap.heatmapApp.stage.removeChild(child);
-    }
-
-    const data = $core.data;
-    const view = $core.view;
-    const layout = $core.layout;
+    const data = processedData;
+    if (!data || !data.length) return;
 
     const cellWidth = layout.pxStep;
-    initialCellWidth = layout.pxStep;
+    const tickStep = 1 / Math.pow(10, layout.prec);
+    const step = $props.aggregationStep || tickStep;
 
-    const step = layout.$step;
+    const y1 = layout.value2y(0);
+    const y2 = layout.value2y(step);
+    const cellHeight = Math.abs(y1 - y2);
 
-    const y1 = layout.value2y(0, false);
-    const y2 = layout.value2y(step, false);
-    const yStepRange = y1 - y2;
-    const yOffset = step * Math.pow(10, layout.prec);
-    let cellHeight = yStepRange / yOffset;
-    cellHeight = Math.max(cellHeight, 2); // Ensure cellHeight is at least 2
+    if (cellHeight < 7 || cellWidth < 35) return;
 
-    for (let i = 0, n = data.length - 1; i <= n; i++) {
-        let obj = new PIXI.Graphics();
+    ctx.font = `bold ${Math.min(12, cellHeight * 0.6)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-        const timestamp = data[i][0];
+    ctx.fillStyle = 'white';
+    ctx.shadowColor = 'rgba(0, 0, 0, 1)';
+    ctx.shadowBlur = 4;
+
+    for (let i = 0; i < data.length; i++) {
+        const [timestamp, levels] = data[i];
         const x = layout.ti2xWithoutRound(timestamp);
-        let currentPrice = 0;
 
-        try {
-            currentPrice = $core.hub.mainOv.data[i - 1][4] ?? 0;
-        } catch (e) {
-            // Handle exceptions if necessary
-        }
+        if (x + cellWidth/2 < 0 || x - cellWidth/2 > layout.width) continue;
 
-        const asks = data[i][1].a;
-        const bids = data[i][1].b;
+        const drawLabels = (orders) => {
+            if (!orders) return;
+            for (let j = 0; j < orders.length; j += 3) {
+                const price = orders[j];
+                const qty = orders[j+1];
 
-        if (fullLimitOrder) {
-            for (let j = 0; j < asks.length; j += 2) {
-                const price = asks[j];
-                const quantity = asks[j + 1];
-                const y = layout.value2y(price, false);
-                obj.beginFill($props.colorScaleAsks(price * quantity));
-                obj.drawRect(x - (cellWidth / 2) + 0.4, y, cellWidth, cellHeight);
+                const y = layout.value2y(price + step / 2);
+
+                if (y < 0 || y > layout.height) continue;
+
+                ctx.fillText(_volFmt.format(qty), x, y);
             }
+        };
 
-            for (let j = 0; j < bids.length; j += 2) {
-                const price = bids[j];
-                const quantity = bids[j + 1];
-                const y = layout.value2y(price, false);
-
-                obj.beginFill($props.colorScaleBids(price * quantity));
-                obj.drawRect(x - (cellWidth / 2) + 0.4, y, cellWidth, cellHeight);
-            }
-        }
-
-        $core.meta.heatmap.heatmapApp.stage.addChildAt(obj,0);
+        drawLabels(levels.a);
+        drawLabels(levels.b);
     }
 
-    drawnElements = data.length;
-    redraw = false;
-    (window.redraw) = false;
-    redrawCount++;
+    ctx.restore();
 }
 
-function handleHoveredLimitOrders(ctx) {
-    const data = $core.data;
-    const layout = $core.layout;
-    const y1 = $core.layout.value2y(0);
-    const y2 = $core.layout.value2y($core.layout.$step);
-    const yStepRange = y1 - y2;
-    const yOffset = $core.layout.$step * Math.pow(10, $core.layout.prec);
-    let cellHeight = yStepRange / yOffset;
-    if (cellHeight < 2) {
-        cellHeight = 2;
+function aggregateLevels(levels, step) {
+    if (!step || step <= 0) return levels;
+
+    const aggregated = new Map();
+    for (let i = 0; i < levels.length; i += 2) {
+        const price = levels[i];
+        const quantity = levels[i + 1];
+        const exchange = levels[i + 2];
+
+        const bucketPrice = Math.floor(price / step) * step;
+
+        const currentData = aggregated.get(bucketPrice) || { qty: 0, ex: exchange };
+        aggregated.set(bucketPrice, {
+            qty: currentData.qty + quantity,
+            ex: exchange
+        });
     }
 
-    if (hoveredLimitOrder) {
-        cellHeightStep = $core.layout.y2value(0) - $core.layout.y2value(cellHeight);
-        const hoveredColumn = data.find(([timestamp,]) => timestamp === hoveredLimitOrder.x);
-        hoveredTimestamp = hoveredColumn ? hoveredColumn[0] : 0;
-        const yHoveredData = hoveredColumn ? hoveredColumn[1] : undefined;
-
-        if (hoveredTimestamp && yHoveredData) {
-            hoveredYAskValue = yHoveredData.a.find((value) => inRange(value, parseFloat(hoveredLimitOrder.y)));
-            hoveredYBidValue = yHoveredData.b.find((value) => inRange(value, parseFloat(hoveredLimitOrder.y)));
-        }
+    const result = [];
+    for (let [p, data] of aggregated) {
+        result.push(p, data.qty, data.ex);
     }
+    return result;
 }
 
-function drawHoveredLimitOrders(ctx) {
-    const data = $core.data;
-    const view = $core.view;
-    const layout = $core.layout;
-    const cellWidth = layout.pxStep;
-    const y1 = $core.layout.value2y(0);
-    const y2 = $core.layout.value2y($core.layout.$step);
-    const yStepRange = y1 - y2;
-    const yOffset = $core.layout.$step * Math.pow(10, $core.layout.prec);
-    let cellHeight = yStepRange / yOffset;
-    if (cellHeight < 2) {
-        cellHeight = 2;
-    }
-
-    let xColumnsToHighlight = [];
-    if (hoveredTimestamp) {
-        xColumnsToHighlight = getRowsToHighlight(hoveredTimestamp, view, data);
-    }
-
-    const hoveredYValue = hoveredYAskValue ?? hoveredYBidValue;
-
-    if (!hoveredYValue) {
-        return void 0;
-    }
-
-    for (const timestamp of xColumnsToHighlight) {
-        ctx.strokeRect(layout.ti2xWithoutRound(timestamp) - (cellWidth / 2), layout.value2y(hoveredYValue), cellWidth, cellHeight);
-        ctx.strokeStyle = document.body.classList.contains('light-theme') ? 'black' : 'white';
-    }
+function clearFlags(flags) {
+    flags.redraw = false;
+    flags.redrawNew = false;
+    flags.redrawLast = false;
+    flags.drawMore = false;
+    window[$core.props.id] = flags;
 }
 
-function getRowsToHighlight(hoveredTimestamp, view, data) {
-    let xColumnsToHighlight = [];
-    const idx = data.findIndex((value) => value[0] === hoveredTimestamp);
-    for (let i = idx, n = view.i2; i <= n; i++) {
-        const timestamp = data[i][0];
+function updateGPUData() {
+    const step = $props.aggregationStep;
 
-        if (limitOrderExists(data[i])) {
-            xColumnsToHighlight.push(timestamp);
-        } else {
-            break;
-        }
-    }
-
-    for (let i = idx, n = view.i1; i > n; i--) {
-        const timestamp = data[i][0];
-        if (limitOrderExists(data[i])) {
-            xColumnsToHighlight.push(timestamp)
-        } else {
-            break;
-        }
-    }
-
-    return xColumnsToHighlight;
+    $core.meta.heatmap.updateData(
+        processedData,
+        $core.layout,
+        $core.props,
+        $props.colorScaleAsks,
+        $props.colorScaleBids,
+        step,
+        getExchangeName,
+        maxVolumesMap
+    );
 }
 
-function limitOrderExists(data) {
-    let exists = false;
-    for (let j = 0; j <= data[1].a.length; j += 2) {
-        let price = data[1].a[j];
-        if (inRange(price, parseFloat(hoveredLimitOrder.y))) {
-            exists = true;
-            break;
-        }
-    }
+function getStage() {
+    return $core.meta.heatmap.heatmapApp.stage;
+}
 
-    for (let j = 0; j <= data[1].b.length; j += 2) {
-        let price = data[1].b[j];
-        if (inRange(price, parseFloat(hoveredLimitOrder.y))) {
-            exists = true;
-            break;
-        }
-    }
+const getAskColor = (exchange, v) => $props.colorScaleAsks[exchange]?.(v);
+const getBidColor = (exchange, v) => $props.colorScaleBids[exchange]?.(v);
 
-    return exists;
+const getExchangeName = exchangeId => {
+    switch (exchangeId) {
+        case 'bi-s':
+            return 'BINANCE_SPOT';
+        case 'bi-f':
+            return 'BINANCE_FUTURES';
+        case 'by-s':
+            return 'BYBIT_SPOT';
+        case 'by-f':
+            return 'BYBIT_FUTURES';
+        case 'okx-s':
+            return 'OKX_SPOT';
+        case 'okx-f':
+            return 'OKX_FUTURES';
+        case 'mexc-s':
+            return 'MEXC_SPOT';
+        case 'mexc-f':
+            return 'MEXC_FUTURES';
+        case 'gate-s':
+            return 'GATE_SPOT';
+        case 'gate-f':
+            return 'GATE_FUTURES';
+        case 'bit-s':
+            return 'BITGET_SPOT';
+        case 'bit-f':
+            return 'BITGET_FUTURES';
+        default:
+            return 'UNKNOWN_EXCHANGE';
+    }
 }
 
 function inRange(price, value) {
-    return price + 0 >= value && price - cellHeightStep <= value
-}
-
-function click(event) {
-    if ($core.meta.tool !== 'Cursor') {
-        return void 0;
-    }
-
-    event.target.dispatchEvent(new CustomEvent("limit-order-clicked", {
-        detail: {
-            hoveredYAskValue,
-            hoveredYBidValue,
-            hoveredTimestamp,
-            x: event.layerX - 200,
-            y: event.layerY
-        },
-        bubbles: true
-    }));
-}
-
-function mousemove(event) {
-    const x = $core.cursor.time;
-    const precision = Math.pow(10, $core.layout.prec);
-    const roundedY = (Math.ceil($core.layout.y2value(event.layerY) * precision) / precision);
-    const y = roundedY.toFixed($core.layout.prec);
-    hoveredLimitOrder = {x, y};
-}
-
-function mouseout() {
-    hoveredLimitOrder = {x: 0, y: 0};
-    hoveredYAskValue = undefined;
-    hoveredYBidValue = undefined;
-    hoveredTimestamp = undefined;
+    return (value <= price) && (value >= (price - cellHeightStep));
 }
 
 function gradient(val, type) {
-    const min_value = 10_000;
-    const max_value = 500_000;
-    const startOpacity = 1;
-    const opacityMin = 0.1;
+    const max_value = maxVolumesMap['BINANCE_FUTURES'];
+    let opacityMin = 0.3;
     const opacityMax = 1;
 
-    const opacity = Math.max(val / max_value, 0.2);
+    const mid = (opacityMin + max_value) / 2;
+    opacityMin = Math.max(opacityMin, 0.1);
+    const range = [rgba('#440154', opacityMin), rgba('#219e89', mid), rgba('#fde725', opacityMax)]
 
     if (type === 'asks') {
-        return d3.scaleLinear()
-            .range([`rgba(255,0,0, ${opacityMin})`, `rgba(255,242,0, ${(opacityMin + opacityMax) / 2})`, `rgba(30,150,0,${opacityMax})`])
-            .domain([5_000, max_value]);
+        return d3.scalePow()
+            .exponent(2)
+            .range(range)
+            .domain([0, max_value * 0.5, max_value])
+            .clamp(true);
     }
 
     if (type === 'bids') {
-        return d3.scaleLinear()
-            .range([`rgba(30,150,0,${opacityMin})`, `rgba(255,242,0,${(opacityMin + opacityMax) / 2})`, `rgba(255,0,0, ${opacityMax})`])
-            .domain([5_000, max_value]);
+        return d3.scalePow()
+            .exponent(2)
+            .range(range)
+            .domain([0, max_value * 0.5, max_value])
+            .clamp(true);
     }
 }
+
+function rgba (hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 static yRange(data) {
     let len = data.length

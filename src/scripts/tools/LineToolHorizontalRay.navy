@@ -200,6 +200,18 @@ yRange(data, a, low)
     return [high, low]
 }
 
-legend()
-=>
-null
+legend() => null
+
+function valueTracker(x) {
+    if ($core.dataExt.lines?.length) {
+        return $core.dataExt.lines.map(line => ({
+            show: true,
+            line: false,
+            color: line.color,
+            value: line.p1[1],
+            additional: true
+        }))
+    }
+
+    return {};
+}

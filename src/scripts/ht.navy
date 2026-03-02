@@ -1,0 +1,733 @@
+// NavyJS ~ 0.2-lite
+
+// <ds>Heatmap</ds>, format:
+// [<timestamp>, <open>, <high>, <low>, <close>, <?volume>]
+
+
+[OVERLAY name = Heatmap123, ctx = Canvas, version = 1.0.0]
+
+prop('colorScaleAsks', { type: 'string', def: {} });
+prop('colorScaleBids', { type: 'string', def: {} });
+
+prop('showLabels',     { type: 'boolean', def: true });
+prop('aggregationStep', { type: 'number', def: 0 });
+
+let hoveredLimitOrder = { x: 0, y: 0 };
+let hoveredYAskValue;
+let hoveredYBidValue;
+let hoveredTimestamp;
+let hoveredExchangeCode;
+let cellHeightStep = 0;
+let fullLimitOrder = true;
+let redrawCount = 0;
+let redrawInProgress = false;
+let mergeDensityThreshold = 0.2;
+
+let _asksScale = null;
+let _bidsScale = null;
+let _compactFmt = null;
+
+let drawnElements = 0;
+const msInDay = 60 * 1000;
+
+init() {
+    // _asksScale = gradient(0, 'asks');
+    // _bidsScale = gradient(0, 'bids');
+    _compactFmt = new Intl.NumberFormat('en', { notation: 'compact' });
+}
+
+function draw(ctx) {
+    if (!$core.meta?.heatmap) return;
+
+    const flags = window?.[$core.props.id] || {};
+    if (flags.redraw === undefined) {
+        flags.redraw = true;
+    }
+
+    if (flags.redraw) {
+        drawHeatmap();
+    } else {
+        handleHoveredLimitOrders(ctx);
+        drawHoveredLimitOrders(ctx);
+    }
+
+    if (flags.drawMore)   drawMore();
+    if (flags.redrawLast) redrawLast();
+    if (flags.redrawNew)  redrawNew();
+
+    if ($core.view.length <= 30 && $props.showLabels) {
+        // drawLabel(ctx);
+    }
+}
+
+function getStage() {
+    return $core.meta.heatmap.heatmapApp.stage;
+}
+
+function getCellMetrics() {
+    const layout = $core.layout;
+    const stage  = getStage();
+
+    const step = layout.$step;
+    const y1 = layout.value2y(0, false);
+    const y2 = layout.value2y(step, false);
+    const yStepRange = y1 - y2;
+    const yOffset = step * Math.pow(10, layout.prec);
+
+    const scaleX = stage.scale.x;
+    const scaleY = stage.scale.y;
+
+    const cellWidth  = layout.pxStep / scaleX;
+    const cellHeight = Math.max(yStepRange / yOffset / scaleY, 1);
+
+    return { layout, stage, scaleX, scaleY, cellWidth, cellHeight };
+}
+
+const getAskColor = (exchange, v) => $props.colorScaleAsks[exchange]?.(v);
+const getBidColor = (exchange, v) => $props.colorScaleBids[exchange]?.(v);
+
+const getExchangeName = exchangeId => {
+    switch (exchangeId) {
+        case 'bi-s':
+            return 'BINANCE_SPOT';
+        case 'bi-f':
+            return 'BINANCE_FUTURES';
+        case 'by-s':
+            return 'BYBIT_SPOT';
+        case 'by-f':
+            return 'BYBIT_FUTURES';
+        case 'okx-s':
+            return 'OKX_SPOT';
+        case 'okx-f':
+            return 'OKX_FUTURES';
+        case 'mexc-s':
+            return 'MEXC_SPOT';
+        case 'mexc-f':
+            return 'MEXC_FUTURES';
+        case 'gate-s':
+            return 'GATE_SPOT';
+        case 'gate-f':
+            return 'GATE_FUTURES';
+        case 'bit-s':
+            return 'BITGET_SPOT';
+        case 'bit-f':
+            return 'BITGET_FUTURES';
+        default:
+            return 'UNKNOWN_EXCHANGE';
+    }
+}
+
+function drawOrderBlocks(graphics, orders, colorFn, x, cellWidth, _defaultHeight, layout, scaleY, stageY) {
+    const step = $props.aggregationStep > 0 ? $props.aggregationStep : 0;
+
+    const effectiveOrders = $props.aggregationStep > 0 ? aggregateLevels(orders, step) : orders;
+
+    const y1 = layout.value2y(0, false);
+    const y2 = layout.value2y(step, false);
+    const effectiveCellHeight = Math.max(Math.abs(y1 - y2) / scaleY, 1);
+
+    for (let j = 0; j < effectiveOrders.length; j += 2) {
+        const price    = effectiveOrders[j];
+        const quantity = effectiveOrders[j + 1];
+        const exchange = effectiveOrders[j + 2];
+
+        const y = (layout.value2y(price + step, false) - stageY) / scaleY;
+
+        // const color = colorFn(getExchangeName(exchange), price * quantity);
+        const color = '#314233';
+        if (!color) {
+            continue;
+        }
+
+        graphics.beginFill(color);
+        graphics.drawRect(x, y, cellWidth, effectiveCellHeight);
+        graphics.endFill();
+    }
+}
+
+function aggregateLevels(levels, step) {
+    if (!step || step <= 0) return levels;
+
+    const aggregated = new Map();
+    for (let i = 0; i < levels.length; i += 2) {
+        const price = levels[i];
+        const quantity = levels[i + 1];
+        const exchange = levels[i + 2];
+
+        const bucketPrice = Math.floor(price / step) * step;
+
+        const currentData = aggregated.get(bucketPrice) || { qty: 0, ex: exchange };
+        aggregated.set(bucketPrice, {
+            qty: currentData.qty + quantity,
+            ex: exchange
+        });
+    }
+
+    const result = [];
+    for (let [p, data] of aggregated) {
+        result.push(p, data.qty, data.ex);
+    }
+    return result;
+}
+
+function renderAllColumns(data, graphics, lastGraphics, metrics, candlesData) {
+    const { layout, stage, scaleX, scaleY, cellWidth, cellHeight } = metrics;
+    const halfCellWidth = cellWidth / ($core.view.length > 50 ? 2.5 : 2);
+    const stageX = stage.position.x;
+    const stageY = stage.position.y;
+
+    const lastIdx = data.length - 1;
+
+    for (let i = 0; i <= lastIdx; i++) {
+        if (!data[i]) {
+            const timestampToUpdate = parseInt(data[data.length - 1][0])
+            data[data.length - 1][0] = (timestampToUpdate + msInDay).toString();
+        }
+
+        const [timestamp, levels] = data[i] ? data[i] : data[data.length - 1];
+
+        const x = (layout.ti2xWithoutRound(timestamp) - stageX) / scaleX - halfCellWidth;
+
+        const target = (i === lastIdx) ? lastGraphics : graphics;
+
+        if (fullLimitOrder) {
+            drawOrderBlocks(target, levels.a, getAskColor, x, cellWidth, cellHeight, layout, scaleY, stageY);
+            drawOrderBlocks(target, levels.b, getBidColor, x, cellWidth, cellHeight, layout, scaleY, stageY);
+        }
+
+        drawCandle(target, $core.hub.mainOv.data?.[i], scaleX, scaleY, stage, cellWidth);
+    }
+}
+
+function renderRange(data, startIdx, endIdx, graphics, metrics, candlesData) {
+    const { layout, stage, scaleX, scaleY, cellWidth, cellHeight } = metrics;
+    const halfCellWidth = cellWidth / ($core.view.length > 50 ? 2.5 : 2);
+    const stageX = stage.position.x;
+    const stageY = stage.position.y;
+
+    for (let i = startIdx; i <= endIdx; i++) {
+        const [timestamp, levels] = data[i];
+        const x = (layout.ti2xWithoutRound(timestamp) - stageX) / scaleX - halfCellWidth;
+
+        drawOrderBlocks(graphics, levels.a, getAskColor, x, cellWidth, cellHeight, layout, scaleY, stageY);
+        drawOrderBlocks(graphics, levels.b, getBidColor, x, cellWidth, cellHeight, layout, scaleY, stageY);
+
+        drawCandle(graphics, $core.hub.mainOv.data?.[i], scaleX, scaleY, stage, cellWidth);
+    }
+}
+
+function safeStageFirstChild() {
+    const stage = getStage();
+    return stage.children?.[0];
+}
+
+function firstChildCellHeightPxOr(metrics) {
+    const stageChild = safeStageFirstChild();
+    if (stageChild?.geometry?.graphicsData?.[0]?.shape?.height) {
+        return stageChild.geometry.graphicsData[0].shape.height * metrics.stage.scale.y;
+    }
+    return Math.max(metrics.cellHeight * metrics.stage.scale.y, 2);
+}
+
+function levelsHasPrice(levelsArray, yValue) {
+    for (let j = 0; j < levelsArray.length; j += 2) {
+        const price = levelsArray[j];
+        if (inRange(price, yValue)) return true;
+    }
+    return false;
+}
+
+function findPriceInLevels(levelsArray, yValue) {
+    const step = $props.aggregationStep > 0 ? $props.aggregationStep : 0;
+    const dataToSearch = step > 0 ? aggregateLevels(levelsArray, step) : levelsArray;
+
+    for (let j = 0; j < dataToSearch.length; j += 2) {
+        const price = dataToSearch[j];
+        const exchange = dataToSearch[j + 2];
+        if (inRange(price, yValue)) return {price, exchange};
+    }
+    return undefined;
+}
+
+function redrawNew() {
+    if (!$core.meta?.heatmap) return;
+
+    window[$core.props.id].redrawNew = false;
+
+    const data = $core.data;
+    const metrics = getCellMetrics();
+    const stage = metrics.stage;
+
+    const lastElementData = data[data.length - 1];
+    const lastStageChild  = stage.children[stage.children.length - 1];
+    if (!lastStageChild?.geometry?.graphicsData?.[0]?.shape) return;
+
+    const lastShape  = lastStageChild.geometry.graphicsData[0].shape;
+    const cellWidth  = lastShape.width;
+    const xPos       = lastShape.x + cellWidth;
+
+    const obj = new PIXI.Graphics();
+
+    drawOrderBlocks(obj, lastElementData[1].a, getAskColor, xPos, cellWidth, metrics.cellHeight, metrics.layout, metrics.scaleY, stage.position.y);
+    drawOrderBlocks(obj, lastElementData[1].b, getBidColor, xPos, cellWidth, metrics.cellHeight, metrics.layout, metrics.scaleY, stage.position.y);
+
+    stage.addChild(obj);
+    drawnElements = data.length;
+    window.drawnElements = drawnElements;
+}
+
+function redrawLast() {
+    if (!$core.meta?.heatmap) return;
+
+
+    window[$core.props.id].redrawLast = false;
+
+    const data    = $core.data;
+    const metrics = getCellMetrics();
+    const stage   = metrics.stage;
+
+    const lastElementData = data[data.length - 1];
+    const lastGraphics    = stage.children[stage.children.length - 1];
+    if (!lastGraphics) return;
+
+    lastGraphics.clear();
+
+    const cellWidth = metrics.cellWidth;
+    const xPos = (metrics.layout.ti2xWithoutRound(lastElementData[0]) - stage.position.x) / metrics.scaleX - (cellWidth / 2);
+
+    drawOrderBlocks(lastGraphics, lastElementData[1].a, getAskColor, xPos, cellWidth, metrics.cellHeight, metrics.layout, metrics.scaleY, stage.position.y);
+    drawOrderBlocks(lastGraphics, lastElementData[1].b, getBidColor, xPos, cellWidth, metrics.cellHeight, metrics.layout, metrics.scaleY, stage.position.y);
+}
+
+function drawMore() {
+    if (redrawInProgress || !$core.meta?.heatmap) return;
+
+    redrawInProgress = true;
+    window[$core.props.id].drawMore = false;
+
+    let data = [];
+    const metrics = getCellMetrics();
+    const stage   = metrics.stage;
+
+    const graphics = new PIXI.Graphics();
+
+    // В оригинале логика: дорисовывать с 0 до (drawnElements - 1)
+    const startIdx = window.drawnElements ?? drawnElements ?? data.length;
+    const endIdx   = Math.max(0, startIdx - 1);
+
+    if ($core.lib.Utils.isMobile) {
+        for (const rowData of $core.data) {
+            rowData[1].a = getTopPairs(rowData[1].a);
+            rowData[1].b = getTopPairs(rowData[1].b);
+
+            data.push(rowData);
+        }
+    } else {
+        data = $core.data;
+    }
+
+    if (endIdx >= 0) {
+        renderRange(data, 0, endIdx, graphics, metrics, $core.hub.mainOv.data);
+        stage.addChildAt(graphics, 0);
+    }
+
+    redrawInProgress = false;
+}
+
+function drawHeatmap() {
+    if (!$core.meta?.heatmap || !$core.data?.length) return;
+
+    window[$core.props.id].redraw = false;
+
+    const metrics = getCellMetrics();
+    const data = $core.data;
+
+    const buffer = buildInstanceBuffer(data, metrics);
+
+    const heatmap = $core.meta.heatmap;
+
+    console.log(buffer);
+
+    // 🔥 если размер изменился — пересоздаём buffer
+    if (!heatmap.instanceBuffer.data || heatmap.instanceBuffer.data.length !== buffer.length) {
+        heatmap.instanceBuffer = new PIXI.Buffer(buffer, true, false);
+
+        heatmap.heatmapMesh.geometry.getAttribute('aRect').buffer = heatmap.instanceBuffer;
+        heatmap.heatmapMesh.geometry.getAttribute('aColor').buffer = heatmap.instanceBuffer;
+    } else {
+        heatmap.instanceBuffer.update(buffer);
+    }
+
+    // 🔥 ВАЖНО
+    heatmap.heatmapMesh.instanceCount = buffer.length / 8;
+
+    console.log("Stage pos:", heatmap.heatmapApp.stage.position, "scale:", heatmap.heatmapApp.stage.scale);
+
+
+    const testBuffer = new Float32Array([
+        100, 100, 500, 500, 1, 0, 0, 1,
+        200, 200, 500, 500, 0, 1, 0, 1
+    ]);
+
+    heatmap.instanceBuffer.update(testBuffer);
+    heatmap.heatmapMesh.instanceCount = testBuffer.length / 8;
+
+
+    drawnElements = data.length;
+    window.drawnElements = drawnElements;
+    redrawCount++;
+}
+
+
+function buildInstanceBuffer(data, metrics) {
+
+    const { layout, stage, scaleX, scaleY, cellWidth } = metrics;
+
+    const halfCellWidth = cellWidth / ($core.view.length > 50 ? 2.5 : 2);
+    const stageX = stage.position.x;
+    const stageY = stage.position.y;
+
+    const step = $props.aggregationStep > 0 ? $props.aggregationStep : 0;
+
+    const y1 = layout.value2y(0, false);
+    const y2 = layout.value2y(step, false);
+    const cellHeight = Math.max(Math.abs(y1 - y2) / scaleY, 1);
+
+    const result = [];
+
+    for (let i = 0; i < data.length; i++) {
+
+        const [timestamp, levels] = data[i];
+
+        const x = (layout.ti2xWithoutRound(timestamp) - stageX) / scaleX - halfCellWidth;
+
+        pushOrders(levels.a, getAskColor, x, cellWidth, cellHeight, layout, scaleY, stageY, step, result);
+        pushOrders(levels.b, getBidColor, x, cellWidth, cellHeight, layout, scaleY, stageY, step, result);
+    }
+
+    return new Float32Array(result);
+}
+
+function pushOrders(
+    orders,
+    colorFn,
+    x,
+    width,
+    height,
+    layout,
+    scaleY,
+    stageY,
+    step,
+    buffer
+) {
+
+    const effectiveOrders = step > 0 ? aggregateLevels(orders, step) : orders;
+
+    for (let j = 0; j < effectiveOrders.length; j += 2) {
+
+        const price = effectiveOrders[j];
+        const qty   = effectiveOrders[j + 1];
+        const ex    = effectiveOrders[j + 2];
+
+        const y = (layout.value2y(price + step, false) - stageY) / scaleY;
+
+        // const color = colorFn(getExchangeName(ex), price * qty);
+        const color = 'rgba(100, 55, 33, 1)'
+        if (!color) continue;
+
+        // const rgba = parseRGBA(color);
+        const rgba = [5, 5, 5, 1];
+
+        buffer.push(
+            x, y,
+            10, 10,
+            rgba[0], rgba[1], rgba[2], rgba[3]
+        );
+    }
+}
+
+const getTopPairs = (arr, topN = 40) => {
+    const pairs = [];
+    for (let i = 0; i < arr.length; i += 2) {
+        const pair = [arr[i], arr[i + 1], arr[i + 2]];
+        const product = pair[0] * pair[1];
+        pairs.push({ pair, product });
+    }
+
+    return pairs
+        .sort((a, b) => b.product - a.product)
+        .slice(0, topN)
+        .flatMap(({ pair }) => pair);
+}
+
+function parseRGBA(str) {
+
+    if (!str) return [0,0,0,0];
+
+    const match = str.match(/rgba?\(([^)]+)\)/);
+    if (!match) return [0,0,0,0];
+
+    const parts = match[1].split(',').map(v => parseFloat(v));
+
+    return [
+        parts[0] / 255,
+        parts[1] / 255,
+        parts[2] / 255,
+        parts[3] ?? 1
+    ];
+}
+
+function drawCandle(graphics, candle, scaleX, scaleY, stage, cellWidth) {
+    return void 0;
+
+    /*
+    if (!candle) return;
+    const [timestamp, open, high, low, close] = candle;
+    const layout = $core.layout;
+    const x = (layout.ti2xWithoutRound(timestamp) - stage.position.x) / scaleX;
+
+    const yOpen  = (layout.value2y(open,  false) - stage.position.y) / scaleY;
+    const yClose = (layout.value2y(close, false) - stage.position.y) / scaleY;
+    const yHigh  = (layout.value2y(high,  false) - stage.position.y) / scaleY;
+    const yLow   = (layout.value2y(low,   false) - stage.position.y) / scaleY;
+
+    const candleWidth = cellWidth * 0.8;
+    const bodyColor   = close >= open ? '#41a376' : '#de4646';
+
+    graphics.beginFill(bodyColor);
+    graphics.drawRect(
+      (x - candleWidth / 2) + candleWidth / 8,
+      Math.min(yOpen, yClose),
+      candleWidth,
+      Math.abs(yClose - yOpen)
+    );
+    graphics.endFill();
+    */
+}
+
+function drawLabel(ctx) {
+    ctx.font = '9px Quantico';
+    ctx.fillStyle = (window.theme === 'dark') ? 'rgba(255, 255, 255, .75)' : 'rgba(0, 0, 0, .75)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const data   = $core.data;
+    const view   = $core.view;
+    const layout = $core.layout;
+    const hi     = layout.$hi;
+
+    ctx.beginPath();
+
+    let showLimitOrdersFilter = 100_000;
+    const name = $core.hub.mainOv.name || '';
+    if (name.includes('BTC')) showLimitOrdersFilter = 1_000_000;
+    else if (name.includes('ETH')) showLimitOrdersFilter = 1_000_000;
+    else if (name.includes('XRP') || name.includes('BNB')) showLimitOrdersFilter = 500_000;
+
+    for (let i = view.i1, n = view.i2; i <= n; i++) {
+        const timestamp = data[i][0];
+        const x = layout.ti2xWithoutRound(timestamp);
+
+        const sides = [data[i][1].a, data[i][1].b];
+
+        sides.forEach(side => {
+            for (let j = 0; j < side.length; j += 2) {
+                const price    = side[j];
+                if (price > hi) continue;
+                const quantity = side[j + 1];
+                const exchange = slide[j + 2];
+
+                const y = layout.value2y(price, false);
+                if (price * quantity > showLimitOrdersFilter) {
+                    const value = convertPrice(price * quantity);
+                    if (value) ctx.fillText(value, x, y - 5);
+                }
+            }
+        });
+    }
+    ctx.closePath();
+}
+
+function handleHoveredLimitOrders(ctx) {
+    const data    = $core.data;
+    const metrics = getCellMetrics();
+
+    let cellHeightPx = firstChildCellHeightPxOr(metrics);
+    cellHeightPx = Math.max(cellHeightPx, 2);
+
+    cellHeightStep = $core.layout.y2value(0) - $core.layout.y2value(cellHeightPx);
+
+    if (!hoveredLimitOrder) return;
+
+    const xTs = parseInt(hoveredLimitOrder.x);
+    const hoveredColumn = data.find(([timestamp]) => parseInt(timestamp) === xTs);
+    hoveredTimestamp = hoveredColumn ? hoveredColumn[0] : 0;
+    const yHoveredData = hoveredColumn ? hoveredColumn[1] : undefined;
+
+    hoveredYAskValue = undefined;
+    hoveredYBidValue = undefined;
+    hoveredExchangeCode = undefined;
+
+    if (hoveredTimestamp && yHoveredData) {
+        const yVal = parseFloat(hoveredLimitOrder.y);
+
+        const hoveredAsk = findPriceInLevels(yHoveredData.a, yVal);
+        const hoveredBid = findPriceInLevels(yHoveredData.b, yVal);
+
+        if (hoveredAsk) {
+            hoveredYAskValue = hoveredAsk.price;
+            hoveredExchangeCode = hoveredAsk.exchange;
+        }
+
+        if (hoveredBid) {
+            hoveredYBidValue = hoveredBid.price;
+            hoveredExchangeCode = hoveredBid.exchange;
+        }
+    }
+}
+
+function drawHoveredLimitOrders(ctx) {
+    const data    = $core.data;
+    const view    = $core.view;
+    const layout  = $core.layout;
+    const metrics = getCellMetrics();
+
+    const stageChild = safeStageFirstChild();
+    if (!stageChild) return;
+
+    let cellHeightPx = firstChildCellHeightPxOr(metrics);
+    cellHeightPx = Math.max(cellHeightPx, 1);
+
+    let xColumnsToHighlight = [];
+    if (hoveredTimestamp) {
+        xColumnsToHighlight = getRowsToHighlight(hoveredTimestamp, view, data);
+    }
+
+    const hoveredYValue = hoveredYAskValue ?? hoveredYBidValue;
+    if (!hoveredYValue) return;
+
+    ctx.strokeStyle = document.body.classList.contains('light-theme') ? 'black' : 'white';
+    ctx.lineWidth = 1;
+
+    const cellWidth = $core.layout.pxStep; // как в оригинале
+    for (const timestamp of xColumnsToHighlight) {
+        const x = layout.ti2xWithoutRound(timestamp) - (cellWidth / 2);
+        const y = layout.value2y(hoveredYValue);
+        ctx.strokeRect(x, y, cellWidth, cellHeightPx);
+    }
+}
+
+function getRowsToHighlight(hoveredTimestamp, view, data) {
+    const idx = data.findIndex((value) => value[0] === hoveredTimestamp);
+    if (idx < 0) return [];
+
+    let askLimitOrder = false;
+    const col = data[idx][1];
+    const yVal = parseFloat(hoveredLimitOrder.y);
+    if (levelsHasPrice(col.a, yVal)) askLimitOrder = true;
+
+    const res = [ data[idx][0] ];
+
+    for (let i = idx + 1; i <= view.i2; i++) {
+        if (limitOrderExists(data[i], askLimitOrder)) res.push(data[i][0]);
+        else break;
+    }
+
+    for (let i = idx - 1; i >= view.i1; i--) {
+        if (limitOrderExists(data[i], askLimitOrder)) res.push(data[i][0]);
+        else break;
+    }
+
+    return res;
+}
+
+function limitOrderExists(row, askLimitOrder) {
+    const yVal = parseFloat(hoveredLimitOrder.y);
+    if (askLimitOrder) {
+        return levelsHasPrice(row[1].a, yVal);
+    } else {
+        return levelsHasPrice(row[1].b, yVal);
+    }
+}
+
+function inRange(price, value) {
+    return (value <= price) && (value >= (price - cellHeightStep));
+
+    // const step = $props.aggregationStep > 0 ? $props.aggregationStep : cellHeightStep;
+    // return (value >= price) && (value < (price + step));
+}
+
+function convertPrice(price) {
+    if (!price) return void 0;
+    return `${_compactFmt.format(price)}$`;
+}
+
+function click(event) {
+    if ($core.meta.tool !== 'Cursor') return;
+
+    event.target.dispatchEvent(new CustomEvent("limit-order-clicked", {
+        detail: {
+            hoveredYAskValue,
+            hoveredYBidValue,
+            hoveredTimestamp,
+            exchangeCode: hoveredExchangeCode,
+            x: event.offsetX - 200,
+            y: event.offsetY
+        },
+        bubbles: true
+    }));
+}
+
+function mousemove(event) {
+    const x = $core.cursor.time;
+    const precision = Math.pow(10, $core.layout.prec);
+    const roundedY = (Math.ceil($core.layout.y2value(event.offsetY) * precision) / precision);
+    const y = roundedY.toFixed($core.layout.prec);
+    hoveredLimitOrder = { x, y };
+}
+
+function mouseout() {
+    hoveredLimitOrder = { x: 0, y: 0 };
+    hoveredYAskValue = undefined;
+    hoveredYBidValue = undefined;
+    hoveredTimestamp = undefined;
+    hoveredExchangeCode = undefined;
+}
+
+function gradient(val, type) {
+    const max_value = 500_000;
+    const opacityMin = 0.1;
+    const opacityMax = 1;
+
+    if (type === 'asks') {
+        return d3.scaleLinear()
+            .range([`rgba(255,0,0, ${opacityMin})`,
+                `rgba(255,242,0, ${(opacityMin + opacityMax) / 2})`,
+                `rgba(30,150,0, ${opacityMax})`])
+            .domain([5_000, max_value]);
+    }
+
+    if (type === 'bids') {
+        return d3.scaleLinear()
+            .range([`rgba(30,150,0, ${opacityMin})`,
+                `rgba(255,242,0, ${(opacityMin + opacityMax) / 2})`,
+                `rgba(255,0,0, ${opacityMax})`])
+            .domain([5_000, max_value]);
+    }
+}
+
+
+static yRange(data) {
+    let len = data.length
+    var h, l, high = -Infinity, low = Infinity
+    for (var i = 0; i < len; i++) {
+        let point = data[i]
+        if (point[2] > high) high = point[2]
+        if (point[3] < low) low = point[3]
+    }
+    return [high, low]
+}
+
+legend()
+=>
+[]

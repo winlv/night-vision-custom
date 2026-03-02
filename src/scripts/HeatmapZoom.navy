@@ -1,0 +1,327 @@
+    [OVERLAY name = HeatmapZoom, ctx = Canvas, version = 1.0.2]
+
+prop('colorScaleAsks', {type: 'string', def: (value) => gradient(value, 'asks')(value)});
+prop('colorScaleBids', {type: 'string', def: (value) => gradient(value, 'bids')(value)});
+prop('aggregationStep', { type: 'number', def: 0 });
+prop('hoverMode', { type: 'enum', def: 'Magnifier', options: ['Highlight', 'Magnifier'] });
+
+let hoveredLimitOrder = { x: 0, y: 0 };
+let hoveredYAskValue, hoveredYBidValue, hoveredTimestamp, hoveredExchangeCode;
+let cellHeightStep = 0;
+let hoveredAnchorPrice = 0;
+let _compactFmt = new Intl.NumberFormat('en', { notation: 'compact' });
+
+function draw(ctx) {
+    handleHoveredLimitOrders();
+
+    if ($props.hoverMode === 'Highlight') {
+        drawHoveredLimitOrders(ctx);
+    } else {
+        drawMagnifier(ctx);
+    }
+}
+
+function handleHoveredLimitOrders() {
+    const data = $core.data;
+    const layout = $core.layout;
+    const step = $props.aggregationStep > 0 ? $props.aggregationStep : (1 / Math.pow(10, layout.prec));
+
+    if (!hoveredLimitOrder.x) {
+        hoveredTimestamp = undefined;
+        return;
+    }
+
+    const xTs = parseInt(hoveredLimitOrder.x);
+    const hoveredColumn = data.find(([timestamp]) => parseInt(timestamp) === xTs);
+    hoveredTimestamp = hoveredColumn ? hoveredColumn[0] : 0;
+
+    const rawY = parseFloat(hoveredLimitOrder.y);
+    const p = Math.pow(10, layout.prec);
+    const anchorPrice = Math.round(Math.floor(rawY / step) * step * p) / p;
+
+    hoveredYAskValue = undefined;
+    hoveredYBidValue = undefined;
+
+
+    if (hoveredColumn && hoveredColumn[1]) {
+        const levels = hoveredColumn[1];
+        const hoveredAsk = findPriceInLevels(levels.a, anchorPrice);
+        const hoveredBid = findPriceInLevels(levels.b, anchorPrice);
+
+        if (hoveredAsk) {
+            hoveredYAskValue = hoveredAsk.price;
+            hoveredExchangeCode = hoveredAsk.exchange;
+        } else if (hoveredBid) {
+            hoveredYBidValue = hoveredBid.price;
+            hoveredExchangeCode = hoveredBid.exchange;
+        }
+    }
+
+    hoveredAnchorPrice = anchorPrice;
+}
+
+function drawHoveredLimitOrders(ctx) {
+    const layout = $core.layout;
+    const data = $core.data;
+    const view = $core.view;
+
+    const hoveredYValue = hoveredYAskValue ?? hoveredYBidValue;
+    if (hoveredYValue === undefined || !hoveredTimestamp) return;
+
+    const isAsk = !!hoveredYAskValue;
+
+    const step = $props.aggregationStep || (1 / Math.pow(10, layout.prec));
+    const xColumnsToHighlight = getRowsToHighlight(hoveredTimestamp, view, data, isAsk, hoveredYValue, step);
+
+    ctx.save();
+    ctx.strokeStyle = document.body.classList.contains('light-theme') ? '#000' : '#fff';
+    ctx.lineWidth = 2;
+
+    const cellWidth = layout.pxStep;
+
+    const y = layout.value2y(hoveredYValue + step);
+
+    const y1 = layout.value2y(hoveredYValue);
+    const y2 = layout.value2y(hoveredYValue + step);
+    const h = Math.abs(y1 - y2);
+
+    for (const timestamp of xColumnsToHighlight) {
+        const x = layout.ti2xWithoutRound(timestamp) - (cellWidth / 2);
+        ctx.strokeRect(x, y, cellWidth, h);
+    }
+    ctx.restore();
+}
+
+function getRowsToHighlight(hoveredTimestamp, view, data, isAsk, priceToFind, step) {
+    const idx = data.findIndex((value) => value[0] === hoveredTimestamp);
+    if (idx < 0) return [];
+
+    const res = [ data[idx][0] ];
+    for (let i = idx + 1; i < data.length; i++) {
+        if (i > view.i2 + 10) break;
+
+        if (checkPriceExists(data[i], isAsk, priceToFind, step)) {
+            res.push(data[i][0]);
+        } else {
+            break;
+        }
+    }
+
+    for (let i = idx - 1; i >= 0; i--) {
+        if (i < view.i1 - 10) break;
+
+        if (checkPriceExists(data[i], isAsk, priceToFind, step)) {
+            res.push(data[i][0]);
+        } else {
+            break;
+        }
+    }
+
+    return res;
+}
+
+function checkPriceExists(row, isAsk, priceToFind, step) {
+    const levels = isAsk ? row[1].a : row[1].b;
+    if (!levels) return false;
+
+    const p = Math.pow(10, $core.layout.prec);
+    const target = Math.round(priceToFind * p) / p;
+
+    for (let j = 0; j < levels.length; j += 3) {
+        const currentPrice = levels[j];
+        if (currentPrice === target) return true;
+    }
+
+    return false;
+}
+
+function drawMagnifier(ctx) {
+    if (!hoveredTimestamp) return;
+
+    if ($core.meta.hub.mainOv.dataView.length < 50) return;
+
+
+    const data = $core.data;
+    const layout = $core.layout;
+    const step = $props.aggregationStep || (1 / Math.pow(10, layout.prec));
+
+    const winW = 260;
+    const winH = 200;
+    const colCount = 5;
+    const rowCount = 9;
+
+    let winX = $core.cursor.x + 20;
+    let winY = $core.cursor.y - winH / 2;
+
+    if (winX + winW > layout.width) winX = $core.cursor.x - winW - 20;
+    if (winY + winH > layout.height) winY = layout.height - winH - 10;
+    winY = Math.max(10, winY);
+
+    ctx.save();
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.fillStyle = 'rgba(15, 18, 26, 0.98)';
+    ctx.strokeStyle = '#363a45';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(winX, winY, winW, winH, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const priceColW = 60;
+    const cellW = (winW - priceColW) / colCount;
+    const cellH = winH / rowCount;
+
+    const currIdx = data.findIndex(d => d[0] === hoveredTimestamp);
+    if (currIdx < 0) return;
+
+    const centerPrice = hoveredAnchorPrice;
+
+    for (let c = 0; c < colCount; c++) {
+        const dataIdx = currIdx + (colCount - 1 - c);
+        if (!data[dataIdx]) continue;
+
+        const levels = data[dataIdx][1];
+
+        for (let r = 0; r < rowCount; r++) {
+            const price = centerPrice + (Math.floor(rowCount / 2) - r) * step;
+
+            const x = winX + c * cellW;
+            const y = winY + r * cellH;
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.strokeRect(x, y, cellW, cellH);
+
+            const ask = findPriceInLevels(levels.a, price);
+            const bid = findPriceInLevels(levels.b, price);
+            const level = ask || bid;
+
+            if (level) {
+                const isAsk = !!ask;
+                const volume = level.price * (level.qty || 0);
+                const color = isAsk ? $props.colorScaleAsks(volume) : $props.colorScaleBids(volume);
+
+                ctx.fillStyle = color;
+                ctx.fillRect(x + 0.5, y + 0.5, cellW - 1, cellH - 1);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 9px Arial';
+                ctx.textAlign = 'center';
+                const volTxt = _compactFmt.format(level.qty || 0);
+                ctx.fillText(volTxt, x + cellW / 2, y + cellH / 2 + 4);
+            } else {
+                ctx.fillText('0', x + cellW / 2, y + cellH / 2 + 4);
+            }
+
+            if (c === colCount - 1) {
+                ctx.fillStyle = '#848e9c';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillText(price.toFixed(layout.prec), winX + winW - 8, y + cellH / 2 + 4);
+            }
+        }
+    }
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(winX + (colCount - 1) * cellW, winY + Math.floor(rowCount / 2) * cellH, cellW, cellH);
+
+    ctx.restore();
+}
+
+function findPriceInLevels(levelsArray, yValue) {
+    const step = $props.aggregationStep > 0 ? $props.aggregationStep : 0;
+    const dataToSearch = step > 0 ? aggregateLevels(levelsArray, step) : levelsArray;
+
+    for (let j = 0; j < dataToSearch.length; j += 3) {
+        const price = dataToSearch[j];
+        const qty = dataToSearch[j + 1];
+        const exchange = dataToSearch[j + 2];
+        if (inRange(price, yValue)) return {price, exchange, qty};
+    }
+
+    return undefined;
+}
+
+    function inRange(price, value) {
+        const layout = $core.layout;
+        const p = Math.pow(10, layout.prec);
+
+        const normalizedPrice = Math.round(price * p) / p;
+        const normalizedValue = Math.round(value * p) / p;
+
+        const step = $props.aggregationStep || (1 / p);
+
+        return (normalizedValue <= normalizedPrice) && (normalizedValue > (normalizedPrice - step));
+    }
+
+function aggregateLevels(levels, step) {
+    if (!step || step <= 0) return levels;
+
+    const aggregated = new Map();
+    for (let i = 0; i < levels.length; i += 2) {
+        const price = levels[i];
+        const quantity = levels[i + 1];
+        const exchange = levels[i + 2];
+
+        const bucketPrice = Math.floor(price / step) * step;
+
+        const currentData = aggregated.get(bucketPrice) || { qty: 0, ex: exchange };
+        aggregated.set(bucketPrice, {
+            qty: currentData.qty + quantity,
+            ex: exchange
+        });
+    }
+
+    const result = [];
+    for (let [p, data] of aggregated) {
+        result.push(p, data.qty, data.ex);
+    }
+    return result;
+}
+
+function mousemove(e) {
+    const layout = $core.layout;
+    const step = $props.aggregationStep || (1 / Math.pow(10, layout.prec));
+
+    const rawPrice = layout.y2value(e.offsetY);
+    const snappedPrice = Math.floor(rawPrice / step) * step;
+
+
+    hoveredLimitOrder = {
+        x: $core.cursor.time,
+        y: snappedPrice
+    };
+    }
+function mouseout() { hoveredLimitOrder = { x: 0, y: 0 }; }
+function click(e) {
+    const val = hoveredYAskValue ?? hoveredYBidValue;
+    if (val === undefined) return;
+    e.target.dispatchEvent(new CustomEvent("limit-order-clicked", {
+        detail: { hoveredYAskValue, hoveredYBidValue, hoveredTimestamp, exchangeCode: hoveredExchangeCode, price: val },
+        bubbles: true
+    }));
+}
+
+function gradient(val, type) {
+    const max_value = 500_000;
+    const opacityMin = 0.3;
+    const opacityMax = 1;
+
+    if (type === 'asks') {
+        return d3.scaleLinear()
+            .range([`rgba(255,0,0, ${opacityMin})`,
+                `rgba(255,242,0, ${(opacityMin + opacityMax) / 2})`,
+                `rgba(30,150,0, ${opacityMax})`])
+            .domain([5_000, max_value]);
+    }
+
+    if (type === 'bids') {
+        return d3.scaleLinear()
+            .range([`rgba(30,150,0, ${opacityMin})`,
+                `rgba(255,242,0, ${(opacityMin + opacityMax) / 2})`,
+                `rgba(255,0,0, ${opacityMax})`])
+            .domain([5_000, max_value]);
+    }
+}

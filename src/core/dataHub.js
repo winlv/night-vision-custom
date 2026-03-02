@@ -20,6 +20,8 @@ class DataHub {
         // EVENT INTERFACE
         events.on('hub:set-scale-index', this.onScaleIndex.bind(this))
         events.on('hub:display-overlay', this.onDisplayOv.bind(this))
+        events.on('hub:pane-resize', this.onPaneResize.bind(this))
+
     }
 
     init(data) {
@@ -209,6 +211,41 @@ class DataHub {
         this.events.emitSpec(`ll-${llId}`, 'update-ll')
 
     }
+
+
+
+    onPaneResize(event) {
+        const { paneId, deltaPx } = event;
+
+        const panes = this.panes();
+        const pane = panes[paneId];
+        if (!pane) return;
+
+        // const Hpx = totalHeightPx;
+        const Hpx = this.se.chart.height;
+
+        const weights = panes.map(p => p.settings.height ?? 1);
+        const W = weights.reduce((a, b) => a + b, 0);
+
+        const deltaW = (-deltaPx / Hpx) * W;
+
+        const minW = 0.05;
+
+        const next = (pane.settings.height ?? 1) + deltaW;
+        if (next < minW) return;
+
+        const main = panes[this.mainPaneId];
+        if (main && main !== pane) {
+            const mainNext = (main.settings.height ?? 1) - deltaW;
+            if (mainNext < minW) return;
+            main.settings.height = mainNext;
+        }
+
+        pane.settings.height = next;
+
+        this.events.emitSpec('chart', 'update-layout');
+    }
+
 }
 
 let instances = {}

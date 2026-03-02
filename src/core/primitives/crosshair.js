@@ -110,9 +110,9 @@ export default class Crosshair extends Layer {
     }
 
     click(event) {
-        if (this.meta.selectedTool) {
-            return void 0;
-        }
+        // if (this.meta.selectedTool) {
+        //     return void 0;
+        // }
 
         const actionButtonHovered = this.actionButtonHovered(event);
         if (actionButtonHovered) {
