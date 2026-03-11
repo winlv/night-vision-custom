@@ -5,8 +5,8 @@
     import.meta.hot
     import {NightVision} from './index.js'
     import {onMount} from 'svelte'
-    import data from '../data/data-ohlcv.json?id=main'
-    // import data from '../data/data-ohlcv-rsi.json?id=main'
+    // import data from '../data/data-ohlcv.json?id=main'
+    import data from '../data/data-ohlcv-rsi.json?id=main'
     // import data from '../data/data-area.json?id=main-2'
     // import data from '../data/data-scales'
     import TestStack from '../tests/testStack.js'
@@ -232,6 +232,6 @@
         <canvas id="heatmapCanvas"
                 style="position:absolute; top:0; left:0;"></canvas>
 
-        <textarea id="canvas-drawing-tool-textarea" style="white-space: nowrap; position: absolute; z-index: 10; font: 14px sans-serif; display: none; resize: none; padding: 0; margin: 0; border: none; background: transparent; outline: none; color: white;"></textarea>
+<!--        <textarea id="canvas-drawing-tool-textarea" style="white-space: nowrap; position: absolute; z-index: 10; font: 14px sans-serif; display: none; resize: none; padding: 0; margin: 0; border: none; background: transparent; outline: none; color: white;"></textarea>-->
     </div>
 </div>

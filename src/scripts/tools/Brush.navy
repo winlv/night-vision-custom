@@ -44,6 +44,12 @@ function keydown(event) {
         if (s) removeBrush(s.data.uuid);
     }
 
+    if (event.code === 'Escape') {
+        brushSelected(null);
+        setTimeout(($events.emit('drawing-mode-off')))
+
+    }
+
     pressedAlt = event.code.toLowerCase().includes('alt');
 }
 

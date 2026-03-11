@@ -50,6 +50,10 @@ function mousedown(event) {
 function mouseup(event) {
     propagate('mouseup', event);
 
+    if ($core.meta.tool === 'LongShortPosition') {
+        $events.emit('drawing-mode-off');
+    }
+
     let s = Object.values(rectangles).find(x => x.selected);
     if (s) {
         $events.emit('change-tool-data', {
@@ -111,6 +115,7 @@ function newLongShortPosition() {
     rectangles[uuid].onSelect = toolSelected;
     rectangles[uuid].selected = true;
     rectangles[uuid].state = 'dragging';
+
 }
 
 function toolSelected($uuid) {

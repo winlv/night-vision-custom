@@ -98,6 +98,7 @@ export default class Brush {
         this.state = 'settled';
         this.propagate('mouseup', event);
         this.drag = {t: undefined, v: undefined};
+        this.hover = false;
     }
 
     mouseout(event) {

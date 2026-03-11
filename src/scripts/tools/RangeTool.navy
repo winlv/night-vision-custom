@@ -152,7 +152,7 @@ mouseout(event) {
 
 mouseup(event) {
     shift = false;
-    $events.emit('drawing-mode-off');
+    // $events.emit('drawing-mode-off');
 }
 
 mousedown(event) {

@@ -13,7 +13,6 @@ export default class Segment {
 
     // Update line coordinates
     update(p1, p2) {
-
         const layout = this.core.layout
 
         this.x1 = layout.time2x(p1[0])

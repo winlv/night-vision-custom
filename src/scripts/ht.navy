@@ -346,9 +346,6 @@ function drawHeatmap() {
 
     const heatmap = $core.meta.heatmap;
 
-    console.log(buffer);
-
-    // 🔥 если размер изменился — пересоздаём buffer
     if (!heatmap.instanceBuffer.data || heatmap.instanceBuffer.data.length !== buffer.length) {
         heatmap.instanceBuffer = new PIXI.Buffer(buffer, true, false);
 
@@ -358,11 +355,7 @@ function drawHeatmap() {
         heatmap.instanceBuffer.update(buffer);
     }
 
-    // 🔥 ВАЖНО
     heatmap.heatmapMesh.instanceCount = buffer.length / 8;
-
-    console.log("Stage pos:", heatmap.heatmapApp.stage.position, "scale:", heatmap.heatmapApp.stage.scale);
-
 
     const testBuffer = new Float32Array([
         100, 100, 500, 500, 1, 0, 0, 1,

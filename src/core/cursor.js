@@ -82,34 +82,35 @@ export default class Cursor {
 
     // Calculate y-values for each scale
     yValues(layout) {
-        let gridId = this.gridId
+        let gridId = this.gridId;
 
-        // Calculate y-value from y(px)
-        if (!layout.grids[gridId]) return
+        if (!layout.grids[gridId]) return;
 
-        this.scales = {}
-        let grid = layout.grids[gridId]
+        this.scales = {};
+        let grid = layout.grids[gridId];
 
         for (var scale of Object.values(grid.scales)) {
             let $ = this.y2value(this.y, scale);
 
             if (this.meta.magnet && this.meta.ohlcMap[this.ti]) {
-                const low = this.meta.ohlcMap[this.ti].ref[3];
-                const high = this.meta.ohlcMap[this.ti].ref[2];
-                if ($ <= low) {
-                    const distance = (Math.abs($ - low)) / low * 100;
-                    if (distance <= 10) {
-                        $ = low;
-                    }
-                } else {
-                    const distance = (Math.abs($ - high)) / high * 100;
-                    if (distance <= 10) {
-                        $ = high;
-                    }
+                const ohlc = this.meta.ohlcMap[this.ti].ref;
+                const high = ohlc[2];
+                const low = ohlc[3];  // Low
+
+                const distLow = (Math.abs($ - low) / low) * 100;
+                const distHigh = (Math.abs($ - high) / high) * 100;
+
+                const threshold = 1.0;
+
+                if (distLow < distHigh && distLow <= threshold) {
+                    $ = low;
+                } else if (distHigh <= threshold) {
+                    $ = high;
                 }
             }
 
             this.scales[scale.scaleSpecs.id] = $;
+
             this.y = this.value2y($, scale);
         }
     }

@@ -52,6 +52,35 @@ export default class Rectangle {
                 pin.draw(ctx, strokeStyle)
             }
         }
+
+        if (this.data.text) {
+            const { x1, y1, x2, y2 } = this.rectangle;
+            const color = this.data.textColor ?? '#dc9800';
+
+            ctx.save();
+
+            ctx.font = "bold " + this.data.textSize + "px sans-serif";
+            ctx.fillStyle = color;
+
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            const centerX = (x1 + x2) / 2;
+            const centerY = (y1 + y2) / 2;
+
+            const left = Math.min(x1, x2);
+            const top = Math.min(y1, y2);
+            const width = Math.abs(x2 - x1);
+            const height = Math.abs(y2 - y1);
+
+            ctx.beginPath();
+            ctx.rect(left, top, width, height);
+            ctx.clip();
+
+            ctx.fillText(this.data.text, centerX, centerY);
+
+            ctx.restore();
+        }
     }
 
     collision() {
@@ -92,7 +121,6 @@ export default class Rectangle {
             return void 0;
         }
 
-        console.log(this.state);
         if (this.state !== 'tracking' && this.core.meta.tool !== 'Cursor') {
             return void 0;
         }

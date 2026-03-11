@@ -1,162 +1,127 @@
-import {Utils} from "../../../index.js";
-
 export default class Text {
-
-    constructor(core, line, nw = false) {
+    constructor(core, data) {
         this.core = core;
-        this.data = line;
-        this.data.collision = this.collision.bind(this);
-        this.hover = false;
+        this.data = data;
         this.selected = false;
+        this.hover = false;
         this.typing = false;
-        this.onSelect = () => {
-        }
-        this.drag = {t: undefined, v: undefined};
+        this.drag = { t: null, v: null, mStartT: null, mStartV: null };
+        this.box = { w: 0, h: 0 };
+        this.padding = 8;
+    }
+
+    updateBox(ctx) {
+        const { text, textSize } = this.data;
+        ctx.font = `${textSize}px Roboto, Arial, sans-serif`;
+        const lines = (text || "").split('\n');
+        const lineHeight = textSize * 1.2;
+
+        let maxW = 0;
+        lines.forEach(line => {
+            const w = ctx.measureText(line).width;
+            if (w > maxW) maxW = w;
+        });
+
+        this.box.w = Math.max(maxW, 20);
+        this.box.h = Math.max(lines.length * lineHeight, textSize);
     }
 
     draw(ctx) {
-        const { x, y, text, predictedText } = this.data;
-        const layout = this.core.layout;
+        if (this.typing) return;
 
+        const { x, y, text, textSize, textColor } = this.data;
+        const layout = this.core.layout;
         const canvasX = layout.time2x(x);
         const canvasY = layout.value2y(y);
 
-        ctx.font = `${this.data.textSize}px Roboto, sans-serif`;
-        ctx.textBaseline = 'top';
-        ctx.fillStyle = this.data.textColor;
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 3;
+        this.updateBox(ctx);
 
-        const lines = text.split('\n');
-        const predictedLines = predictedText.split('\n');
+        const lines = (text || "").split('\n');
+        const lineHeight = textSize * 1.2;
 
-        const maxLineWidth = Math.max(...predictedLines.map(line => ctx.measureText(line).width));
-        const lineHeight = this.data.textSize * 1.2;
+        ctx.save();
 
-        if (!this.typing) {
-            lines.forEach((line, i) => {
-                if (line) {
-                    const lineY = canvasY + i * lineHeight;
-                    ctx.strokeText(line, canvasX, lineY);
-                    ctx.fillText(line, canvasX, lineY);
-                }
-            });
-        }
-
-        this.data.textWidth = maxLineWidth;
-
-        if (this.selected) {
-            const padding = 6;
-            const totalHeight = lines.length * lineHeight;
+        if (this.selected || this.hover) {
             ctx.beginPath();
-            ctx.roundRect(canvasX - padding, canvasY - padding, maxLineWidth + 2 * padding, totalHeight + 2 * padding, 2);
-            ctx.strokeStyle = 'blue';
-            ctx.lineWidth = 2;
+            ctx.setLineDash(this.selected ? [] : [5, 5]);
+            ctx.strokeStyle = this.selected ? '#3399ff' : 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.roundRect(
+                canvasX - this.padding,
+                canvasY - this.padding,
+                this.box.w + this.padding * 2,
+                this.box.h + this.padding * 2,
+                4
+            );
             ctx.stroke();
+
+            if (this.selected) {
+                ctx.fillStyle = 'rgba(51, 153, 255, 0.05)';
+                ctx.fill();
+            }
         }
+
+        ctx.font = `${textSize}px Roboto, Arial, sans-serif`;
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = textColor;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = this.selected ? 0 : 2;
+
+        lines.forEach((line, i) => {
+            ctx.fillText(line, canvasX, canvasY + i * lineHeight);
+        });
+
+        ctx.restore();
     }
 
     collision() {
-        if (!this.data?.text) {
-            return false;
-        }
         const mouse = this.core.mouse;
-        const { x, y, text } = this.data;
         const layout = this.core.layout;
-
-        const canvasX = layout.time2x(x);
-        const canvasY = layout.value2y(y);
-
-        const textWidth = this.data.textWidth;
-        const textHeight = this.data.textSize;
-
-        const padding = 6;
-        const boxX = canvasX - padding;
-        const boxY = canvasY - padding;
-        const boxWidth = textWidth + 2 * padding;
-        const boxHeight = textHeight + 2 * padding;
+        const cx = layout.time2x(this.data.x);
+        const cy = layout.value2y(this.data.y);
+        const p = this.padding;
 
         return (
-            mouse.x >= boxX && mouse.x <= boxX + boxWidth &&
-            mouse.y >= boxY && mouse.y <= boxY + boxHeight
+            mouse.x >= cx - p &&
+            mouse.x <= cx + this.box.w + p &&
+            mouse.y >= cy - p &&
+            mouse.y <= cy + this.box.h + p
         );
     }
 
-    propagate(name, data) {
+    mousedown(event) {
+        if (this.collision() && this.core.meta.tool === 'Cursor') {
+            const layout = this.core.layout;
+            this.drag.t = this.data.x;
+            this.drag.v = this.data.y;
+            this.drag.mStartT = layout.x2time(event.layerX);
+            this.drag.mStartV = layout.y2value(event.layerY);
+            this.core.events.emit('scroll-lock', true);
+            return true;
+        }
+        return false;
     }
 
-    mousedown(event) {
-        this.propagate('mousedown', event)
-        if (this.collision()) {
-            if (this.core.meta.tool !== 'Cursor') {
-                return void 0;
-            }
-
-            if (this.selected) {
-                this.typing = true;
-            }
-
-            this.selected = true;
-
-            this.onSelect(this.data.uuid)
-            this.core.events.emit('scroll-lock', true);
-
-            const layout = this.core.layout;
-            this.drag.t = layout.x2time(event.layerX);
-            this.drag.v = layout.y2value(event.layerY);
-        } else {
-            this.typing = false;
-        }
-    };
-
-    mouseup(event) {
-        // this.state = this.pins.some(pin => pin.state === 'tracking') ? 'tracking' : 'settled';
-        this.propagate('mouseup', event)
-        this.drag.t = null;
-        this.drag.v = null;
-    };
-
     mousemove(event) {
-        if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
-            return void 0;
-        }
-
-        if (this.core.meta.tool !== 'Cursor') {
-            return void 0;
-        }
-
-        if (!this.collision() && this.hover && !Utils.isMobile) {
-            event.target.style.cursor = 'default';
-        }
-
         this.hover = this.collision();
-        this.propagate('mousemove', event);
 
-        if (this.selected) {
-            if (this.hover && !this.typing && !Utils.isMobile) {
-                event.target.style.cursor = 'text';
-            }
-
-            if (this.typing) {
-                return void 0;
-            }
-
-            if (!this.drag.t || !this.drag.v) {
-                return;
-            }
-
+        if (this.drag.mStartT !== null) {
             const layout = this.core.layout;
+            const currentT = layout.x2time(event.layerX);
+            const currentV = layout.y2value(event.layerY);
 
-            const dt = layout.x2time(event.layerX) - this.drag.t;
-            const dy = layout.y2value(event.layerY) - this.drag.v;
+            const dTime = currentT - this.drag.mStartT;
+            const dValue = currentV - this.drag.mStartV;
 
-            this.data.x += dt;
-            this.data.y += dy;
-
-            this.drag.t = layout.x2time(event.layerX);
-            this.drag.v = layout.y2value(event.layerY);
-
+            this.data.x = this.drag.t + dTime;
+            this.data.y = this.drag.v + dValue;
             this.core.events.emit('update-layout');
         }
-    };
+    }
+
+    mouseup() {
+        this.drag.mStartT = null;
+        this.drag.mStartV = null;
+        this.core.events.emit('scroll-lock', false);
+    }
 }

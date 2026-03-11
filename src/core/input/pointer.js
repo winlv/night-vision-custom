@@ -51,8 +51,8 @@ export default class Input {
     }
 
     async setup(comp) {
-        this.ZOOM_SENS_X = comp.props.config.ZOOM_SENS;
-        this.ZOOM_SENS_Y = comp.props.config.ZOOM_SENS;
+        this.ZOOM_SENS_X = comp.props.config.ZOOM_X_SENS;
+        this.ZOOM_SENS_Y = comp.props.config.ZOOM_Y_SENS;
         this.MIN_ZOOM = comp.props.config.MIN_ZOOM;
         this.MAX_ZOOM = comp.props.config.MAX_ZOOM;
         this.canvas = comp.canvas;

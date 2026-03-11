@@ -19,6 +19,8 @@ prop('color', {type: 'string', def: '#dc9800'});
 prop('lineWidth', {type: 'string', def: 2});
 prop('lineStyle', {type: 'string', def: 0});
 prop('initYPos', {type: 'number', def: undefined});
+prop('textColor', {type: 'string', def: '#dc9800'});
+prop('textSize', {type: 'number', def: 12});
 
 
 function init(ctx) {

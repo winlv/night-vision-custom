@@ -3,10 +3,12 @@
 
 [OVERLAY name = TrendRay, ctx = Canvas, verion = 1.0.0]
 
-prop('color', { type: 'Color', def: '#b98200' })
+prop('color', { type: 'Color', def: '#dc9800' })
 prop('lineType', {type: 'string', def: 'solid'});
 prop('lineWidth', {type: 'number', def: 1});
 prop('alert', {type: 'boolean', def: false});
+prop('textColor', {type: 'string', def: '#dc9800'});
+prop('textSize', {type: 'number', def: 12});
 
 let timeId = null
 let mouseX = 0
@@ -54,7 +56,10 @@ function newLine() {
         lineType: $props.lineType,
         color: $props.color,
         alert: $props.alert,
-        crossed: false
+        crossed: false,
+        textColor: $props.textColor,
+        textSize: $props.textSize,
+        text: ""
     }
     $core.dataExt.lines.push(line)
     lines[uuid] = new $lib.TrendLine($core, line, true)
@@ -127,13 +132,26 @@ propagate(name, data)
 }
 
 function mousedown(event) {
-    if ($core.meta.tool === 'TrendRay') {
-        timeId = setTimeout(newLine, 0)
+    let clicked = null;
+    const entries = Object.entries(lines).reverse();
+    for (const [uuid, line] of entries) {
+        if (line.collision()) {
+            clicked = uuid;
+            break;
+        }
     }
 
-    mouseX = $core.mouse.x;
-    lineSelected(null);
-    $events.emit('update-layout');
+    if (clicked) {
+        lineSelected(clicked);
+        lines[clicked].mousedown(event);
+    } else {
+        lineSelected(null);
+        if ($core.meta.tool === 'TrendRay') {
+            timeId = setTimeout(newLine, 0);
+            mouseX = $core.mouse.x;
+        }
+    }
+
     propagate('mousedown', event);
 }
 

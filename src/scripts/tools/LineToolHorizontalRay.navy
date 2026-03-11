@@ -6,6 +6,8 @@
 prop('color', { type: 'Color', def: '#b98200' })
 prop('lineType', {type: 'string', def: 'solid'});
 prop('lineWidth', {type: 'number', def: 1});
+prop('textColor', {type: 'string', def: '#dc9800'});
+prop('textSize', {type: 'number', def: 12});
 
 let timeId = null
 let mouseX = 0
@@ -66,7 +68,10 @@ function newLine() {
         uuid: uuid,
         lineWidth: $props.lineWidth,
         lineType: $props.lineType,
-        color: $props.color
+        color: $props.color,
+        textColor: $props.textColor,
+        textSize: $props.textSize,
+        text: ""
     }
     $core.dataExt.lines.push(line)
     lines[uuid] = new $lib.TrendLine($core, line, true)
@@ -131,15 +136,37 @@ propagate(name, data)
     }
 }
 
-mousedown(event)
-{
-    if ($core.meta.tool === 'LineToolHorizontalRay' || event.which === 3) {
-        timeId = setTimeout(newLine, 0)
+function mousedown(event) {
+    if (event.which === 3) {
+        lineSelected(null);
+        timeId = setTimeout(newLine, 0);
+        mouseX = $core.mouse.x;
+
+        propagate('mousedown', event);
+
+        return void 0;
     }
 
-    mouseX = $core.mouse.x;
-    lineSelected(null);
-    $events.emit('update-layout');
+    let clicked = null;
+    const entries = Object.entries(lines).reverse();
+    for (const [uuid, line] of entries) {
+        if (line.collision()) {
+            clicked = uuid;
+            break;
+        }
+    }
+
+    if (clicked) {
+        lineSelected(clicked);
+        lines[clicked].mousedown(event);
+    } else {
+        lineSelected(null);
+        if ($core.meta.tool === 'LineToolHorizontalRay') {
+            timeId = setTimeout(newLine, 0);
+            mouseX = $core.mouse.x;
+        }
+    }
+
     propagate('mousedown', event);
 }
 

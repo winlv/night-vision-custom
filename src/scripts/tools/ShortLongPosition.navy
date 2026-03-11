@@ -50,6 +50,10 @@ function mousedown(event) {
 function mouseup(event) {
     propagate('mouseup', event);
 
+    if ($core.meta.tool === 'ShortLongPosition') {
+        $events.emit('drawing-mode-off');
+    }
+
     let s = Object.values(rectangles).find(x => x.selected);
     if (s) {
         $events.emit('change-tool-data', {

@@ -4,6 +4,8 @@ prop('color', {type: 'string', def: '#cccccc'});
 prop('lineWidth', {type: 'number', def: 2});
 prop('lineType', {type: 'string', def: 'solid'});
 prop('fillColor', {type: 'string', def: '#ffffff'});
+prop('textColor', {type: 'string', def: '#dc9800'});
+prop('textSize', {type: 'number', def: 12});
 
 let timeId = null;
 let mouseX = 0;
@@ -141,7 +143,10 @@ function newRectangle() {
         color: $props.color,
         fillColor: $props.fillColor,
         lineType: $props.lineType,
-        uuid: uuid
+        uuid: uuid,
+        textColor: $props.textColor,
+        textSize: $props.textSize,
+        text: ""
     };
 
     $core.dataExt.rectangles.push(rectangle);

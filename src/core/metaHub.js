@@ -60,7 +60,7 @@ class MetaHub {
     }
 
     setTool(toolName) {
-        if (this.tool === toolName && toolName !== 'Cursor') {
+        if (this.tool === toolName && toolName !== 'Cursor' && toolName !== 'Brush') {
             this.tool = 'Cursor';
         } else {
             this.tool = toolName;
@@ -105,7 +105,8 @@ class MetaHub {
     drawingModeOff = () => {
         this.tool = 'Cursor';
         this.drawingMode = false;
-        this.events.emit('meta:tool-changed', { tool: 'Cursor', drawingMode: false });
+        this.toolSelected({type: 'Cursor'});
+        this.events.emit('tool-changed', { tool: 'Cursor', drawingMode: false });
     }
 
     objectSelected = ({id}) => {

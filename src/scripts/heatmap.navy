@@ -14,7 +14,7 @@ prop('colorScaleBids', {type: 'string', def: {
     }});
 
 prop('showLabels',     { type: 'boolean', def: true });
-prop('aggregationStep', { type: 'number', def: 0 });
+prop('aggregationStep', { type: 'number', def: 0.01 });
 
 let cellHeightStep = 0;
 
@@ -62,14 +62,15 @@ function draw(ctx) {
 
     if (flags.redraw || flags.redrawNew || flags.redrawLast || flags.drawMore) {
         const data = $core.data;
-        const step = $props.aggregationStep;
+        // const step = $props.aggregationStep;
+        const step = (1 / Math.pow(10, $core.layout.prec));
 
         processedData = data.map(row => {
             const ts = row[0];
             const levels = row[1];
 
-            const aggA = step > 0 ? aggregateLevels(levels.a, step) : levels.a;
-            const aggB = step > 0 ? aggregateLevels(levels.b, step) : levels.b;
+            const aggA = aggregateLevels(levels.a, step);
+            const aggB = aggregateLevels(levels.b, step);
 
             const findMax = (levs) => {
                 for (let k = 0; k < levs.length; k += 3) {
@@ -78,6 +79,11 @@ function draw(ctx) {
                     const exId = levs[k+2];
 
                     const exName = EXCHANGES_CONFIG[exId] || 'UNKNOWN';
+
+                    if (exName === 'UNKNOWN') {
+                        continue;
+                    }
+
                     const v = price * qty;
 
                     if (!maxVolumesMap[exName] || v > maxVolumesMap[exName]) {
@@ -157,7 +163,8 @@ function calculateSpoofing(data) {
 function drawSpoofingLines(ctx) {
 
     const layout = $core.layout;
-    const step = $props.aggregationStep || (1 / Math.pow(10, layout.prec));
+    // const step = $props.aggregationStep || (1 / Math.pow(10, layout.prec));
+    const step = (1 / Math.pow(10, layout.prec));
 
     ctx.save();
     ctx.lineWidth = 2;
@@ -189,7 +196,8 @@ function drawVolumeLabels(ctx) {
 
     const cellWidth = layout.pxStep;
     const tickStep = 1 / Math.pow(10, layout.prec);
-    const step = $props.aggregationStep || tickStep;
+    // const step = $props.aggregationStep || tickStep;
+    const step = (1 / Math.pow(10, layout.prec));
 
     const y1 = layout.value2y(0);
     const y2 = layout.value2y(step);
@@ -236,25 +244,24 @@ function aggregateLevels(levels, step) {
     if (!step || step <= 0) return levels;
 
     const aggregated = new Map();
-    for (let i = 0; i < levels.length; i += 2) {
+    for (let i = 0; i < levels.length; i += 3) {
         const price = levels[i];
         const quantity = levels[i + 1];
         const exchange = levels[i + 2];
 
-        const bucketPrice = Math.floor(price / step) * step;
+        const bucketPrice = Math.round(price / step) * step;
 
-        const currentData = aggregated.get(bucketPrice) || { qty: 0, ex: exchange };
-        aggregated.set(bucketPrice, {
-            qty: currentData.qty + quantity,
-            ex: exchange
-        });
+        const currentData = aggregated.get(bucketPrice);
+        if (currentData) {
+            currentData.qty += quantity;
+        } else {
+            aggregated.set(bucketPrice, { qty: quantity, ex: exchange });
+        }
     }
 
-    const result = [];
-    for (let [p, data] of aggregated) {
-        result.push(p, data.qty, data.ex);
-    }
-    return result;
+    return Array.from(aggregated.entries())
+        .sort((a, b) => a[0] - b[0])
+        .flatMap(([price, data]) => [price, data.qty, data.ex]);
 }
 
 function clearFlags(flags) {
@@ -267,7 +274,8 @@ function clearFlags(flags) {
 
 let prevRange = "";
 function updateGPUData() {
-    const step = $props.aggregationStep;
+    // const step = $props.aggregationStep;
+    const step = (1 / Math.pow(10, $core.layout.prec));
 
     const crntRange = JSON.stringify($core.range) + $core.layout.$hi + $core.layout.$low;
 

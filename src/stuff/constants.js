@@ -86,7 +86,8 @@ const ChartConfig = {
     AUTO_PRE_SAMPLE: 10, // Sample size for auto-precision
     CANDLE_TIME: true, // Show remaining candle time
     DOUBLE_CLICK_ALERT: false,
-    ZOOM_SENS: 0.4
+    ZOOM_X_SENS: 0.4,
+    ZOOM_Y_SENS: 0.3
 }
 
 ChartConfig.FONT =
