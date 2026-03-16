@@ -62,22 +62,12 @@ function newLine() {
     const inst = new $lib.TrendLine($core, lineData, true);
     lines[uuid] = inst;
 
-    selectLine(uuid);
+    lineSelected(uuid);
     $events.emit('scroll-lock', true);
     $events.emit('update-layout');
 }
 
-function selectLine(uuid) {
-    activeUuid = uuid;
-    for (const id in lines) {
-        lines[id].selected = (id === uuid);
-    }
-    $events.emit('object-selected', {id: uuid || undefined, type: uuid ? 'LineTool' : undefined});
-    $events.emit('update-layout');
-}
-
 function lineSelected($uuid) {
-
     if (!$uuid) {
         $events.emit('object-selected', {id: undefined, type: undefined});
     }
@@ -106,7 +96,7 @@ function removeLine(uuid) {
     $core.dataExt.lines = $core.dataExt.lines.filter(x => x.uuid !== uuid);
     $events.emit('change-tool-data', { data: $core.dataExt.lines, id: $core.id });
     $events.emit('update-layout');
-    selectLine(null);
+    lineSelected(null);
 }
 
 function mousedown(event) {
@@ -120,10 +110,10 @@ function mousedown(event) {
     }
 
     if (clicked) {
-        selectLine(clicked);
+        lineSelected(clicked);
         lines[clicked].mousedown(event);
     } else {
-        selectLine(null);
+        lineSelected(null);
         if ($core.meta.tool === 'LineTool') {
             timeId = setTimeout(newLine, 0);
             mouseX = $core.mouse.x;
@@ -152,12 +142,17 @@ function mousemove(event) {
 }
 
 function mouseup(event) {
-    clearTimeout(timeId);
+    clearTimeout(timeId)
+    timeId = null
     propagate('mouseup', event);
-    $events.emit('change-tool-data', { data: $core.dataExt.lines, id: $core.id });
 
     if ($core.meta.tool === 'LineTool') {
         $events.emit('drawing-mode-off');
+    }
+
+    let s = Object.values(lines).find(x => x.selected);
+    if (s) {
+        $events.emit('change-tool-data', { data: $core.dataExt.lines, id: $core.id });
     }
 }
 

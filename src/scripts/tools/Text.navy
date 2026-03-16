@@ -8,7 +8,7 @@ let activeUuid = null;
 let isEditingNow = false;
 
 function init() {
-    $core.dataExt.texts = $core.dataExt.texts || [];
+    $core.dataExt.texts = $core.data || [];
     // Инициализация существующих объектов
     $core.dataExt.texts.forEach(data => {
         if (!texts[data.uuid]) {

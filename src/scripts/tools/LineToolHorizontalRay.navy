@@ -43,11 +43,11 @@ draw(ctx)
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        if (line.pins[0].y$ > currentPrice) {
-            ctx.fillText(line.pins[0].y$.toFixed($core.layout.prec), lineData.x1, lineData.y1 - 10);
-        } else {
-            ctx.fillText(line.pins[0].y$.toFixed($core.layout.prec), lineData.x1, lineData.y1 + 10);
-        }
+        // if (line.pins[0].y$ > currentPrice) {
+        //     ctx.fillText(line.pins[0].y$.toFixed($core.layout.prec), lineData.x1, lineData.y1 - 10);
+        // } else {
+        //     ctx.fillText(line.pins[0].y$.toFixed($core.layout.prec), lineData.x1, lineData.y1 + 10);
+        // }
     }
 }
 

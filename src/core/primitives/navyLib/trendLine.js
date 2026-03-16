@@ -65,7 +65,7 @@ export default class TrendLine {
             const color = this.data.color ?? '#dc9800';
 
             ctx.save();
-            ctx.font = "12px sans-serif"; // Можно вынести в настройки
+            ctx.font = "bold " + this.data.textSize + "px sans-serif";
             ctx.fillStyle = color;
 
             // Рассчитываем угол наклона линии
@@ -75,13 +75,13 @@ export default class TrendLine {
                 ctx.textAlign = "left";
                 ctx.textBaseline = "middle";
 
-                const offset = 10;
-                const textX = x2 + Math.cos(angle) * offset;
-                const textY = y2 + Math.sin(angle) * offset;
+                const textWidth = ctx.measureText(this.data.text).width;
+                const textX = x2 - textWidth - 5;
+                const textY = y2 - 10;
 
                 ctx.translate(textX, textY);
+                ctx.fillStyle = this.data.textColor;
                 ctx.fillText(this.data.text, 0, 0);
-
             } else {
                 ctx.textAlign = "center";
                 ctx.textBaseline = "bottom";
@@ -97,6 +97,7 @@ export default class TrendLine {
 
                 ctx.rotate(angle);
 
+                ctx.fillStyle = this.data.textColor;
                 ctx.fillText(this.data.text, 0, -5);
             }
 

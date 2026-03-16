@@ -145,7 +145,7 @@ export default class Heatmap {
         this.lastScales.asks = cacheKey;
     }
 
-    updateData(data, layout, props, colorScaleAsks, colorScaleBids, aggStep, exchange, maxVolumesMap) {
+    updateData(data, layout, props, colorScaleAsks, colorScaleBids, aggStep, exchange, maxVolumesMap, fullRedraw = false) {
         if (!this.instancedMesh || !data.length) return;
 
         this.updatePalettes(colorScaleAsks, colorScaleBids, maxVolumesMap);

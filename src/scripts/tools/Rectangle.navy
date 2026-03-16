@@ -52,13 +52,6 @@ function keyup(event) {
 }
 
 function mousedown(event) {
-    if (unfinishedRectangles()) {
-        $events.emit('update-layout');
-        propagate('mousedown', event);
-        $events.emit('drawing-mode-off');
-        return void 0;
-    }
-
     if ($core.meta.tool !== 'Rectangle') {
         rectangleSelected(null);
         $events.emit('update-layout');
@@ -74,7 +67,12 @@ function mousedown(event) {
 }
 
 function mouseup(event) {
+    clearTimeout(timeId)
+    timeId = null
     propagate('mouseup', event);
+    if ($core.meta.tool === 'Rectangle') {
+        $events.emit('drawing-mode-off');
+    }
 
     let s = Object.values(rectangles).find(x => x.selected);
     if (s) {

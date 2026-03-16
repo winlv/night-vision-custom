@@ -10108,7 +10108,17 @@
           "name": "Text",
           "type": "Text",
           "drawingTool": true,
-          "data": [],
+          "data": [
+            {
+              "x": 1752105600000,
+              "y": 17.5,
+              "text": "aaasd",
+              "uuid": "24556429025560522",
+              "textSize": 16,
+              "textColor": "#ffffff",
+              "overlayType": "Text"
+            }
+          ],
           "props": {
           },
           "settings": {
