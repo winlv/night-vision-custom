@@ -10,8 +10,9 @@ export default class FibRetracement {
         this.selected = false
         this.onSelect = () => {
         }
-        this.fibRetracement = new core.lib.FibRetracementShape(core);
         this.drag = {t: undefined, v: undefined};
+
+        this.fibRetracement = new core.lib.FibRetracementShape(core, this);
         this.pins = [
             new core.lib.Pin(core, this, 'p1', {cursor: 'default'}),
             new core.lib.Pin(core, this, 'p2', {cursor: 'default'})
@@ -23,7 +24,13 @@ export default class FibRetracement {
     }
 
     draw(ctx) {
-        this.fibRetracement.update(this.data.p1, this.data.p2);
+        const settings = {
+            lineWidth: this.data.lineWidth,
+            levels: this.data.levels,
+            backOpacity: this.data.backOpacity
+        };
+
+        this.fibRetracement.update(this.data.p1, this.data.p2, settings);
         this.fibRetracement.draw(ctx);
 
         if (this.hover || this.selected) {

@@ -10,6 +10,7 @@ prop('textSize', {type: 'number', def: 12});
 let timeId = null;
 let mouseX = 0;
 let rectangles = {}
+let pressedShift = false;
 
 function init() {
     $core.dataExt.rectangles = $core.data;
@@ -44,14 +45,26 @@ function keydown(event) {
         rectangleSelected(null);
         $events.emit('update-layout');
     }
-    pressedAlt = event.code.toLowerCase().includes('alt');
+
+    if (event.code.toLowerCase().includes('alt')) pressedAlt = true;
+
+    if (event.code.toLowerCase().includes('shift')) {
+        pressedShift = true;
+        $events.emit('update-layout');
+    }
 }
 
 function keyup(event) {
-    pressedAlt = false;
+    if (event.code.toLowerCase().includes('alt')) pressedAlt = false;
+
+    if (event.code.toLowerCase().includes('shift')) {
+        pressedShift = false;
+        $events.emit('update-layout');
+    }
 }
 
 function mousedown(event) {
+    pressedShift = event.shiftKey;
     if ($core.meta.tool !== 'Rectangle') {
         rectangleSelected(null);
         $events.emit('update-layout');
@@ -67,6 +80,7 @@ function mousedown(event) {
 }
 
 function mouseup(event) {
+    pressedShift = event.shiftKey;
     clearTimeout(timeId)
     timeId = null
     propagate('mouseup', event);
@@ -86,6 +100,7 @@ function mouseup(event) {
 }
 
 function mousemove(event) {
+    pressedShift = event.shiftKey;
     propagate('mousemove', event);
 }
 
@@ -118,7 +133,6 @@ function removeRectangle(uuid) {
 
 function newRectangle() {
 
-    // if (unfinishedRectangles() || mouseMoved()) return
     if (mouseMoved()) {
         return void 0;
     }
@@ -132,7 +146,6 @@ function newRectangle() {
     let uuid = $lib.Utils.uuid3();
 
     let rectangle = {
-        // points: {x: time, y: yValue, width: 50, height: 50},
         p1: [time, yValue],
         p2: [time, yValue],
         p3: [time, yValue],

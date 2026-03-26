@@ -7,17 +7,15 @@ export default class Rectangle {
         this.hover = false
         this.pinHover = false;
         this.selected = false
-        this.drag = {t: null, v: null};  // Drag tracking state
-        this.onSelect = () => {
-        }
+        this.pressedShift = false;
+        this.drag = {t: null, v: null};
+        this.onSelect = () => {}
 
         this.state = 'settled';
         this.rectangle = new core.lib.RectangleShape(core);
         this.pins = [
             new core.lib.Pin(core, this, 'p1', {cursor: 'nwse-resize'}),
             new core.lib.Pin(core, this, 'p2', {cursor: 'nwse-resize'}),
-            // new core.lib.Pin(core, this, 'p3'),
-            // new core.lib.Pin(core, this, 'p4')
         ]
         if (nw) {
             this.pins[1].state = 'tracking';
@@ -27,6 +25,28 @@ export default class Rectangle {
 
     draw(ctx) {
         const strokeStyle = this.data.color ?? '#dc9800';
+
+        const trackingPinIndex = this.pins.findIndex(pin => pin.state === 'tracking' || pin.state === 'dragging');
+        if (this.pressedShift && trackingPinIndex !== -1) {
+            const layout = this.core.layout;
+            const anchorProp = trackingPinIndex === 0 ? 'p2' : 'p1';
+            const movingProp = trackingPinIndex === 0 ? 'p1' : 'p2';
+
+            const x1 = layout.time2x(this.data[anchorProp][0]);
+            const y1 = layout.value2y(this.data[anchorProp][1]);
+            const x2 = layout.time2x(this.data[movingProp][0]);
+            const y2 = layout.value2y(this.data[movingProp][1]);
+
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const size = Math.max(Math.abs(dx), Math.abs(dy));
+
+            const nx2 = x1 + Math.sign(dx) * size;
+            const ny2 = y1 + Math.sign(dy) * size;
+
+            this.data[movingProp][0] = layout.x2time(nx2);
+            this.data[movingProp][1] = layout.y2value(ny2);
+        }
 
         this.rectangle.update(this.data.p1, this.data.p2)
         ctx.lineWidth = this.data.lineWidth ?? 1;
@@ -135,6 +155,7 @@ export default class Rectangle {
         }
 
         this.pinHover = !!pin;
+        this.pressedShift = event.shiftKey;
 
         if (this.collision() && this.state === 'settled' && !Utils.isMobile) {
             event.target.style.cursor = 'move';
@@ -162,22 +183,10 @@ export default class Rectangle {
             const dt = layout.x2time(event.layerX) - this.drag.t;
             const dy = layout.y2value(event.layerY) - this.drag.v;
 
-            const newP1 = [
-                this.data.p1[0] + dt,
-                this.data.p1[1] + dy
-            ];
-            const newP2 = [
-                this.data.p2[0] + dt,
-                this.data.p2[1] + dy
-            ];
-            const newP3 = [
-                this.data.p3[0] + dt,
-                this.data.p3[1] + dy
-            ];
-            const newP4 = [
-                this.data.p4[0] + dt,
-                this.data.p4[1] + dy
-            ];
+            const newP1 = [this.data.p1[0] + dt, this.data.p1[1] + dy];
+            const newP2 = [this.data.p2[0] + dt, this.data.p2[1] + dy];
+            const newP3 = [this.data.p3[0] + dt, this.data.p3[1] + dy];
+            const newP4 = [this.data.p4[0] + dt, this.data.p4[1] + dy];
 
             this.drag.t = layout.x2time(event.layerX);
             this.drag.v = layout.y2value(event.layerY);

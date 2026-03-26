@@ -32,7 +32,6 @@ class MetaHub {
         this.drawingMode = false;
         this.selectedTool = undefined;
         this.magnet = false;
-        this.tempMagnet = false;
     }
 
     init(props, layout) {
@@ -86,16 +85,16 @@ class MetaHub {
 
     handleKeyboardDown(event) {
         if (event.ctrlKey) {
-            this.tempMagnet = true;
+            this.magnet = true;
         }
     }
 
     handleKeyboardUp(event) {
-        this.tempMagnet = false;
+        this.magnet = false;
     }
 
     get isMagnetActive() {
-        return this.magnet || this.tempMagnet;
+        return this.magnet || this.magnet;
     }
 
     toolSelected = (event) => {

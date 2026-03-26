@@ -70,6 +70,8 @@
                 SCROLL_WHEEL: 'prevent',
                 scrollLock: true,
                 SBMAX: 500,
+                MAX_ZOOM: Infinity,
+                MIN_ZOOM: 5,
                 DEFAULT_LEN: 250,
                 meta: {
                     scrollLock: true

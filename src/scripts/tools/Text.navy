@@ -33,10 +33,9 @@ function mousedown(event) {
     if (isEditingNow) {
         document.getElementById('canvas-text-tool-editor')?.blur();
         return;
-    }
+   }
 
     let clickedUuid = null;
-    // Ищем попадание по тексту (в обратном порядке, чтобы брать верхний)
     const entries = Object.entries(texts).reverse();
     for (const [uuid, textObj] of entries) {
         if (textObj.collision()) {
@@ -169,10 +168,18 @@ function saveData() {
 }
 
 function mousemove(event) {
+    if (isEditingNow) {
+        return;
+    }
+
     for (const t of Object.values(texts)) t.mousemove(event);
 }
 
 function mouseup(event) {
+    if ($core.meta.tool === 'Text') {
+        $events.emit('drawing-mode-off');
+    }
+
     for (const t of Object.values(texts)) t.mouseup(event);
     if (activeUuid && !isEditingNow) saveData();
 }

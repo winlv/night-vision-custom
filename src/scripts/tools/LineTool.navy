@@ -13,6 +13,7 @@ let timeId = null;
 let mouseX = 0;
 let lines = {};
 let activeUuid = null;
+let pressedShift = false;
 
 init()
 {
@@ -101,6 +102,7 @@ function removeLine(uuid) {
 
 function mousedown(event) {
     let clicked = null;
+    pressedShift = event.shiftKey;
     const entries = Object.entries(lines).reverse();
     for (const [uuid, line] of entries) {
         if (line.collision()) {
@@ -124,6 +126,7 @@ function mousedown(event) {
 }
 
 function mousemove(event) {
+    pressedShift = event.shiftKey;
     propagate('mousemove', event);
 
     if ($core.meta.tool !== 'Cursor' && $core.meta.tool !== 'LineTool') return;
@@ -142,6 +145,7 @@ function mousemove(event) {
 }
 
 function mouseup(event) {
+    pressedShift = event.shiftKey;
     clearTimeout(timeId)
     timeId = null
     propagate('mouseup', event);
@@ -156,10 +160,25 @@ function mouseup(event) {
     }
 }
 
+let pressedAlt = false;
 function keydown(event) {
-    if ((event.code === 'Backspace' || event.code === 'Delete') && activeUuid) {
-        removeLine(activeUuid);
+    if ((event.code === 'Backspace' || event.code === 'Delete')) {
+        let s = Object.values(lines).find(x => x.selected)
+        if (s) removeLine(s.data.uuid)
     }
+
+    if (pressedAlt && event.code === 'KeyT') {
+        timeId = setTimeout(newLine, 0)
+
+        mouseX = $core.mouse.x;
+        lineSelected(null);
+        $events.emit('update-layout');
+    }
+    pressedAlt = event.code.toLowerCase().includes('alt');
+}
+
+function keyup(event) {
+    pressedAlt = false;
 }
 
 function propagate(name, data) {

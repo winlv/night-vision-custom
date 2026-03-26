@@ -3,6 +3,23 @@ import FibRetracement from "../../core/primitives/navyLib/fibRetracement.js";
 [OVERLAY name = FibRetracement, ctx = Canvas, version = 1.0.0, author = Dmitry]
 
 prop('lineWidth', {type: 'number', def: 1});
+prop('backOpacity', {type: 'number', def: 0.15});
+prop('levels', {
+    type: 'object',
+    def: [
+        { val: 0, color: '#9e9e9e', active: true },
+        { val: 0.236, color: '#f44336', active: true },
+        { val: 0.382, color: '#ffc400', active: true },
+        { val: 0.5, color: '#00ff0a', active: true },
+        { val: 0.618, color: '#249a27', active: true },
+        { val: 0.786, color: '#13e4d3', active: true },
+        { val: 1, color: '#9e9e9e', active: true },
+        { val: 1.618, color: '#1f5cff', active: true },
+        { val: 2.618, color: '#ff4e00', active: true },
+        { val: 3.618, active: false, color: '#a010c5' },
+        { val: 4.236, active: false, color: '#ff00c3' }
+    ]
+});
 
 let mouseX = 0;
 let lines = {}
@@ -108,7 +125,10 @@ function newTool() {
         p1: [time, yValue],
         p2: [time, yValue],
 
-        uuid: uuid
+        uuid: uuid,
+        levels: JSON.parse(JSON.stringify($props.levels)),
+        lineWidth: $props.lineWidth,
+        backOpacity: $props.backOpacity
     };
 
     $core.dataExt.lines.push(tool);

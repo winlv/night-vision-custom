@@ -1,8 +1,3 @@
-// Interactive trend line (line, ray or segment)
-// Combining line primitive and pins
-
-import TrendRay from "./trendRay.js";
-
 export default class TrendLine {
 
     constructor(core, line, nw = false) {
@@ -12,6 +7,7 @@ export default class TrendLine {
         this.selected = false;
         this.isDragging = false;
         this.lastMousePos = { t: 0, v: 0 };
+        this.pressedShift = false;
 
         switch (line.type) {
             case 'segment':
@@ -40,7 +36,37 @@ export default class TrendLine {
     }
 
     draw(ctx) {
+        const layout = this.core.layout;
         const color = this.data.color ?? '#dc9800';
+
+        const trackingPinIndex = this.pins.findIndex(p => p.state === 'tracking' || p.state === 'dragging');
+
+        if (this.pressedShift && trackingPinIndex !== -1 && this.data.p1 && this.data.p2) {
+            // anchor - неподвижная точка, moving - та, которую тянем
+            const anchor = trackingPinIndex === 0 ? this.data.p2 : this.data.p1;
+            const moving = trackingPinIndex === 0 ? this.data.p1 : this.data.p2;
+
+            const x1 = layout.time2x(anchor[0]);
+            const y1 = layout.value2y(anchor[1]);
+            const x2 = layout.time2x(moving[0]);
+            const y2 = layout.value2y(moving[1]);
+
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+
+            const angle = Math.atan2(dy, dx);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            const snapStep = Math.PI / 4;
+            const snappedAngle = Math.round(angle / snapStep) * snapStep;
+
+            const nx2 = x1 + Math.cos(snappedAngle) * dist;
+            const ny2 = y1 + Math.sin(snappedAngle) * dist;
+
+            moving[0] = layout.x2time(nx2);
+            moving[1] = layout.y2value(ny2);
+        }
+
         this.line.update(this.data.p1, this.data.p2);
 
         ctx.save();
@@ -60,50 +86,12 @@ export default class TrendLine {
         ctx.stroke();
         ctx.restore();
 
+        // Отрисовка текста
         if (this.data.text) {
-            const { x1, y1, x2, y2 } = this.line;
-            const color = this.data.color ?? '#dc9800';
-
-            ctx.save();
-            ctx.font = "bold " + this.data.textSize + "px sans-serif";
-            ctx.fillStyle = color;
-
-            // Рассчитываем угол наклона линии
-            let angle = Math.atan2(y2 - y1, x2 - x1);
-
-            if (this.data.type === 'ray') {
-                ctx.textAlign = "left";
-                ctx.textBaseline = "middle";
-
-                const textWidth = ctx.measureText(this.data.text).width;
-                const textX = x2 - textWidth - 5;
-                const textY = y2 - 10;
-
-                ctx.translate(textX, textY);
-                ctx.fillStyle = this.data.textColor;
-                ctx.fillText(this.data.text, 0, 0);
-            } else {
-                ctx.textAlign = "center";
-                ctx.textBaseline = "bottom";
-
-                const midX = (x1 + x2) / 2;
-                const midY = (y1 + y2) / 2;
-
-                ctx.translate(midX, midY);
-
-                if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
-                    angle += Math.PI;
-                }
-
-                ctx.rotate(angle);
-
-                ctx.fillStyle = this.data.textColor;
-                ctx.fillText(this.data.text, 0, -5);
-            }
-
-            ctx.restore();
+            this.drawText(ctx);
         }
 
+        // Отрисовка пинов управления
         if (this.hover || this.selected || this.pins.some(p => p.state !== 'settled')) {
             for (let pin of this.pins) {
                 pin.draw(ctx, color);
@@ -113,6 +101,31 @@ export default class TrendLine {
         if (this.data.alert) {
             this.drawAlertIcon(ctx);
         }
+    }
+
+    drawText(ctx) {
+        const { x1, y1, x2, y2 } = this.line;
+        ctx.save();
+        ctx.font = "bold " + this.data.textSize + "px sans-serif";
+        ctx.fillStyle = this.data.textColor || this.data.color;
+
+        let angle = Math.atan2(y2 - y1, x2 - x1);
+
+        if (this.data.type === 'ray') {
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillText(this.data.text, x1 + 10, y1 - 10);
+        } else {
+            ctx.textAlign = "center";
+            ctx.textBaseline = "bottom";
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            ctx.translate(midX, midY);
+            if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
+            ctx.rotate(angle);
+            ctx.fillText(this.data.text, 0, -5);
+        }
+        ctx.restore();
     }
 
     drawAlertIcon(ctx) {
@@ -176,6 +189,8 @@ export default class TrendLine {
     }
 
     mousemove(event) {
+        this.pressedShift = event.shiftKey;
+
         if (this.isDragging) {
             const currentT = this.core.cursor.time;
             const currentV = this.core.layout.y2value(this.core.mouse.y);
@@ -191,7 +206,6 @@ export default class TrendLine {
         }
 
         const isDrawing = this.pins.some(p => p.state === 'tracking' || p.state === 'dragging');
-
         if (this.core.meta.tool !== 'Cursor' && !isDrawing) return;
 
         this.hover = this.collision();

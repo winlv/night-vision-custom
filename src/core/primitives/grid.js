@@ -1,6 +1,4 @@
-// Grid layer (actuall # grid). Extends Layer class,
-// TODO: can be replaced by overlay script
-
+// Grid layer (actually # grid). Extends Layer class.
 import Layer from '../layer.js'
 import Const from '../../stuff/constants.js'
 import Events from '../events.js'
@@ -19,8 +17,10 @@ export default class Grid extends Layer {
         this.zIndex = -1000000
         this.ctxType = 'Canvas'
         this.show = true
-        this.lastMouseUpTime = 0;
-        this.doubleClickThreshold = 250;
+
+        this.doubleClickThreshold = 350;
+        this.distThreshold = 15;
+        this.lastTap = { time: 0, x: 0, y: 0 };
 
         this.overlay = {
             draw: this.draw.bind(this),
@@ -30,7 +30,7 @@ export default class Grid extends Layer {
         }
 
         this.env = {
-            update: this.envEpdate.bind(this),
+            update: this.envUpdate.bind(this),
             destroy: () => {}
         }
     }
@@ -42,27 +42,21 @@ export default class Grid extends Layer {
         ctx.strokeStyle = this.props.colors.grid
         ctx.beginPath()
 
-
         const ymax = layout.height
         for (var [x, p] of layout.xs) {
-
             ctx.moveTo(x + HPX, 0)
             ctx.lineTo(x + HPX, ymax)
-
         }
 
         for (var [y, y$] of layout.ys) {
-
             ctx.moveTo(0, y + HPX)
             ctx.lineTo(layout.width, y + HPX)
-
         }
 
         ctx.stroke()
-
     }
 
-    envEpdate(ovSrc, layout, props) {
+    envUpdate(ovSrc, layout, props) {
         this.ovSrc = ovSrc
         this.layout = layout
         this.props = props
@@ -73,8 +67,8 @@ export default class Grid extends Layer {
     }
 
     destroy() {
-        this.events.off('grid-layer');
-        this.lastMouseUpTime = 0;
+        this.events.off(`grid-layer:show-grid`);
+        this.lastTap = { time: 0, x: 0, y: 0 };
     }
 
     mousedown(event) {
@@ -82,30 +76,42 @@ export default class Grid extends Layer {
 
     mouseup(event) {
         if (!this.props.config.DOUBLE_CLICK_ALERT) {
-            return void 0;
+            return;
         }
 
-        const now = Date.now();
-        const timeSinceLastUp = now - this.lastMouseUpTime;
+        const x = event.layerX || (event.changedTouches ? event.changedTouches[0].pageX : 0);
+        const y = event.layerY || (event.changedTouches ? event.changedTouches[0].pageY : 0);
 
-        if (timeSinceLastUp < this.doubleClickThreshold) {
-            this.onDoubleClick(event);
-            this.lastMouseUpTime = 0;
+        const now = Date.now();
+        const timeDiff = now - this.lastTap.time;
+
+        const dist = Math.sqrt(
+            Math.pow(x - this.lastTap.x, 2) +
+            Math.pow(y - this.lastTap.y, 2)
+        );
+
+        if (timeDiff < this.doubleClickThreshold && dist < this.distThreshold) {
+            this.onDoubleClick(event, x, y);
+            this.lastTap = { time: 0, x: 0, y: 0 };
         } else {
-            this.lastMouseUpTime = now;
+            this.lastTap = { time: now, x, y };
         }
     }
 
-    onDoubleClick(event) {
-        const cursor = this.props.cursor;
-        const events = this.events = Events.instance(this.props.id)
-        const yValue = this.layout.y2value(event.layerY);
+    onDoubleClick(event, x, y) {
+        const targetY = y || event.layerY;
+        const yValue = this.layout.y2value(targetY);
 
         const data = {
             gridId: this.id,
             scaleId: this.layout.scaleSpecs.id,
-            yValue
+            yValue: yValue
         };
-        // events.emit('add-signal-level', data);
+
+        this.events.emit('add-signal-level', data);
+
+        if (navigator.vibrate) {
+            navigator.vibrate(15);
+        }
     }
 }

@@ -76,6 +76,8 @@ export default class Input {
         this.meta = MetaHub.instance(this.props.id);
         this.events = Events.instance(this.props.id);
 
+        this.events.on("app:range-changed", e => this.range = e);
+
         await this.listeners();
         this.mouseEvents("addEventListener");
     }
@@ -132,12 +134,35 @@ export default class Input {
         mc.on("panmove", (event) => {
             if (Utils.isMobile) {
                 this.calcOffset();
+
                 this.events.emit('cursor-changed', {
                     gridId: this.gridId,
                     x: event.center.x + this.offsetX,
                     y: event.center.y + this.offsetY
-                })
-                this.propagate("mousemove", this.touch2mouse(event));
+                });
+
+                if (this.drug) {
+                    this.handleMousedrag(
+                        this.drug.x + event.deltaX,
+                        this.drug.y + event.deltaY
+                    );
+                } else {
+                    let scaleId = this.layout.scaleIndex;
+                    let tfrm = this.meta.getYtransform(this.gridId, scaleId);
+
+                    this.drug = {
+                        x: event.center.x + this.offsetX,
+                        y: event.center.y + this.offsetY,
+                        r: this.range.slice(),
+                        t: this.range[1] - this.range[0],
+                        o: tfrm ? tfrm.offset || 0 : 0,
+                        y_r: tfrm && tfrm.range ? tfrm.range.slice() : undefined,
+                        B: this.layout.B,
+                        t0: Utils.now(),
+                    };
+                }
+
+                return;
             }
 
             if (this.drug) {
@@ -152,7 +177,7 @@ export default class Input {
         });
 
         mc.on("panend", (event) => {
-            if (Utils.isMobile && this.drug) this.panFade(event);
+            // if (Utils.isMobile && this.drug) this.panFade(event);
             this.drug = null;
             if (Utils.isMobile) {
                 this.calcOffset();
@@ -211,7 +236,7 @@ export default class Input {
             gridId: this.gridId,
             x: event.layerX,
             y: event.layerY - 1,
-        });
+        })
         this.calcOffset();
         this.propagate("mousemove", event);
     }
@@ -297,39 +322,52 @@ export default class Input {
         let data = this.hub.mainOv.dataSubset;
         const dpr = window.devicePixelRatio ?? 1;
 
-        // --- ZOOM X ---
         let k = this.interval / 1000;
         let diffX = delta * k * data.length * this.ZOOM_SENS_X;
 
+        let ratio = 0.5;
         if (event.originalEvent.ctrlKey || this.props.config.ZOOM_MODE === "tl") {
             let offset = event.originalEvent.offsetX;
-            let ratio = offset / (this.canvas.width / dpr - 1);
-            this.range[0] -= diffX * ratio;
-            this.range[1] += diffX * (1 - ratio);
-        } else {
-            this.range[0] -= diffX;
-            this.range[1] += diffX; // Симметричный зум по умолчанию
+            ratio = offset / (this.canvas.width / dpr - 1);
         }
 
-        // --- ZOOM Y ---
+        let newRange = [
+            this.range[0] - diffX * ratio,
+            this.range[1] + diffX * (1 - ratio)
+        ];
+
+        let newWidth = newRange[1] - newRange[0];
+        const maxW = this.MAX_ZOOM * this.interval;
+        const minW = this.MIN_ZOOM * this.interval;
+
+        if (newWidth > maxW) {
+            let over = newWidth - maxW;
+            newRange[0] += over * ratio;
+            newRange[1] -= over * (1 - ratio);
+        } else if (newWidth < minW) {
+            let under = minW - newWidth;
+            newRange[0] -= under * ratio;
+            newRange[1] += under * (1 - ratio);
+        }
+
+        this.range[0] = newRange[0];
+        this.range[1] = newRange[1];
+
         let scaleId = this.layout.scaleIndex;
         let tfrm = this.meta.getYtransform(this.gridId, scaleId);
         if (tfrm && tfrm.range) {
             let yRange = tfrm.range.slice();
             let yLen = yRange[1] - yRange[0];
-            // Используем множитель для плавности (exp-подобный зум)
             let factor = 1 + (delta * 0.001 * this.ZOOM_SENS_Y);
-
             let newYRange = [
                 yRange[0] + (yLen * (1 - factor)) * 0.5,
                 yRange[1] - (yLen * (1 - factor)) * 0.5
             ];
-
             this.events.emit('sidebar-transform', {
                 gridId: this.gridId,
                 scaleId: scaleId,
                 range: newYRange,
-                auto: false // Выключаем авто-шкалу при ручном зуме
+                auto: false
             });
         }
 
@@ -377,13 +415,19 @@ export default class Input {
     pinchZoom(scale) {
         if (this.meta.scrollLock || !this.pinch) return;
 
-        // --- ZOOM X ---
         let t = this.pinch.t;
         let nt = t / scale;
+
+        // Ограничиваем nt
+        const maxW = this.MAX_ZOOM * this.interval;
+        const minW = this.MIN_ZOOM * this.interval;
+
+        if (nt > maxW) nt = maxW;
+        if (nt < minW) nt = minW;
+
         this.range[0] = this.pinch.r[0] - (nt - t) * 0.5;
         this.range[1] = this.pinch.r[1] + (nt - t) * 0.5;
 
-        // --- ZOOM Y ---
         let scaleId = this.layout.scaleIndex;
         if (this.pinch.y_r) {
             let yR = this.pinch.y_r;

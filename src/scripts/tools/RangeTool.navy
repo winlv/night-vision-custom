@@ -156,30 +156,35 @@ mouseup(event) {
 }
 
 mousedown(event) {
-    if ($core.meta.tool === 'RangeTool' || event.which === 2) {
-        shift = true;
-    }
-    const layout = $core.layout
-    if (state === 'idle' && shift) {
-        $core.meta.scrollLock = true;
-
-        // Create the first pin
-        pin1 = {
-            t: $core.cursor.time,
-            v: layout.y2value(event.layerY)
+    setTimeout(() => {
+        if ($core.meta.selectedTool) {
+            return;
         }
-        pin2 = { ...pin1 }
-        state = 'drawing'
 
-    } else if (state === 'drawing') {
-        state = 'finished'
-    } else if (state === 'finished') {
-        state = 'idle'
-        pin1 = null
-        pin2 = null
-        shift = false;
-    }
-    $events.emitSpec('chart', 'update-layout')
+        if ($core.meta.tool === 'RangeTool' || event.which === 2) {
+            shift = true;
+        }
+        const layout = $core.layout
+        if (state === 'idle' && shift) {
+            $core.meta.scrollLock = true;
+
+            pin1 = {
+                t: $core.cursor.time,
+                v: layout.y2value(event.layerY)
+            }
+            pin2 = { ...pin1 }
+            state = 'drawing'
+
+        } else if (state === 'drawing') {
+            state = 'finished'
+        } else if (state === 'finished') {
+            state = 'idle'
+            pin1 = null
+            pin2 = null
+            shift = false;
+        }
+        $events.emitSpec('chart', 'update-layout')
+    }, 20)
 }
 
 mousemove(event) {

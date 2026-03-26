@@ -72,6 +72,7 @@ export default class Pin {
             r + 0.5, 0, Math.PI * 2, true)
         ctx.fill()
         ctx.stroke()
+        ctx.closePath();
     }
 
     update() {
