@@ -99,17 +99,15 @@ export default class Input {
         this.hm.wheel((event, delta) => this.mousezoom(-delta * 50, event));
 
         let mc = (this.mc = new Hammer.Manager(this.canvas));
-        let T = 0;
-        mc.add(new Hammer.Pan({threshold: T}));
+        mc.add(new Hammer.Pan({ threshold: 0 }));
         mc.add(new Hammer.Tap());
-        mc.add(new Hammer.Pinch({threshold: 0}));
-        mc.get("pinch").set({enable: true});
+        mc.add(new Hammer.Pinch({ threshold: 0 }));
+        mc.get("pinch").set({ enable: true });
         if (Utils.isMobile) mc.add(new Hammer.Press());
 
         mc.on("panstart", (event) => {
-            if (this.cursor.mode === "aim") {
-                return this.emitCursorCoord(event);
-            }
+            // Перемещаем расчет drug выше проверки на aim,
+            // чтобы перетаскивание работало в любом случае
             let scaleId = this.layout.scaleIndex;
             let tfrm = this.meta.getYtransform(this.gridId, scaleId);
             this.drug = {
@@ -122,47 +120,32 @@ export default class Input {
                 B: this.layout.B,
                 t0: Utils.now(),
             };
+
             this.events.emit("cursor-changed", {
                 gridId: this.gridId,
                 x: event.center.x + this.offsetX,
                 y: event.center.y + this.offsetY,
             });
 
-            if (Utils.isMobile) this.calcOffset();
+            if (Utils.isMobile) {
+                this.calcOffset();
+                this.propagate('mousedown', this.touch2mouse(event));
+            }
+
+            if (this.cursor.mode === "aim") {
+                this.emitCursorCoord(event);
+            }
         });
 
         mc.on("panmove", (event) => {
             if (Utils.isMobile) {
                 this.calcOffset();
-
                 this.events.emit('cursor-changed', {
                     gridId: this.gridId,
                     x: event.center.x + this.offsetX,
                     y: event.center.y + this.offsetY
                 });
-
-                if (this.drug) {
-                    this.handleMousedrag(
-                        this.drug.x + event.deltaX,
-                        this.drug.y + event.deltaY
-                    );
-                } else {
-                    let scaleId = this.layout.scaleIndex;
-                    let tfrm = this.meta.getYtransform(this.gridId, scaleId);
-
-                    this.drug = {
-                        x: event.center.x + this.offsetX,
-                        y: event.center.y + this.offsetY,
-                        r: this.range.slice(),
-                        t: this.range[1] - this.range[0],
-                        o: tfrm ? tfrm.offset || 0 : 0,
-                        y_r: tfrm && tfrm.range ? tfrm.range.slice() : undefined,
-                        B: this.layout.B,
-                        t0: Utils.now(),
-                    };
-                }
-
-                return;
+                this.propagate("mousemove", this.touch2mouse(event));
             }
 
             if (this.drug) {
@@ -205,10 +188,7 @@ export default class Input {
         });
 
         mc.on("pinchend", () => { this.pinch = null; });
-
-        mc.on("pinch", (event) => {
-            if (this.pinch) this.pinchZoom(event.scale);
-        });
+        mc.on("pinch", (event) => { if (this.pinch) this.pinchZoom(event.scale); });
 
         mc.on("press", (event) => {
             if (!Utils.isMobile) return;
@@ -218,11 +198,6 @@ export default class Input {
             setTimeout(() => this.events.emitSpec(this.rrId, "update-rr"));
             this.simMousedown(event);
         });
-
-        let add = this.canvas.addEventListener;
-        add("gesturestart", this.gesturestart);
-        add("gesturechange", this.gesturechange);
-        add("gestureend", this.gestureend);
     }
 
     gesturestart(event) { event.preventDefault(); }
@@ -268,6 +243,24 @@ export default class Input {
         this.events.emitSpec(this.rrId, "update-rr");
         this.propagate("mousedown", this.touch2mouse(event));
         setTimeout(() => this.propagate("click", this.touch2mouse(event)));
+    }
+
+    panFade(event) {
+        // let dt = Utils.now() - this.drug.t0;
+        // let dx = this.range[1] - this.drug.r[1];
+        // let v = (42 * dx) / dt;
+        // let v0 = Math.abs(v * 0.01);
+        // if (dt > 500) return;
+        // if (this.fade) this.fade.stop();
+        // this.fade = new FrameAnimation((self) => {
+        //     v *= 0.85;
+        //     if (Math.abs(v) < v0) {
+        //         self.stop();
+        //     }
+        //     this.range[0] += v;
+        //     this.range[1] += v;
+        //     this.changeRange();
+        // });
     }
 
     touch2mouse(e) {

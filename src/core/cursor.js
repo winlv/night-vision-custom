@@ -95,12 +95,12 @@ export default class Cursor {
             if (this.meta.magnet && this.meta.ohlcMap[this.ti]) {
                 const ohlc = this.meta.ohlcMap[this.ti].ref;
                 const high = ohlc[2];
-                const low = ohlc[3];  // Low
+                const low = ohlc[3];
 
                 const distLow = (Math.abs($ - low) / low) * 100;
                 const distHigh = (Math.abs($ - high) / high) * 100;
 
-                const threshold = 1.0;
+                const threshold = 10.0;
 
                 if (distLow < distHigh && distLow <= threshold) {
                     $ = low;

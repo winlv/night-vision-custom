@@ -152,7 +152,9 @@ mouseout(event) {
 
 mouseup(event) {
     shift = false;
-    // $events.emit('drawing-mode-off');
+    if ($core.meta.tool === 'RangeTool') {
+        $events.emit('drawing-mode-off');
+    }
 }
 
 mousedown(event) {
@@ -184,7 +186,7 @@ mousedown(event) {
             shift = false;
         }
         $events.emitSpec('chart', 'update-layout')
-    }, 20)
+    })
 }
 
 mousemove(event) {

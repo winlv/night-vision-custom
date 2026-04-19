@@ -132,12 +132,15 @@ class MetaHub {
                 const idx = drawingOverlay.data.findIndex(d => d.uuid === uuid);
                 if (idx !== -1) {
                     drawingOverlay.data.splice(idx, 1);
-                    if (drawingOverlay.dataExt) {
-                        for (let key in drawingOverlay.dataExt) {
-                            if (Array.isArray(drawingOverlay.dataExt[key])) {
-                                drawingOverlay.dataExt[key].splice(idx, 1);
-                            }
+                }
+
+                if (drawingOverlay.dataExt) {
+                    for (let key in drawingOverlay.dataExt) {
+                        const idx = drawingOverlay.dataExt[key]?.findIndex(d => d.uuid === uuid);
+                        if (idx !== -1) {
+                            drawingOverlay.dataExt[key].splice(idx, 1);
                         }
+
                     }
                 }
             }

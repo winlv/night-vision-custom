@@ -40,7 +40,11 @@ const EXCHANGES_CONFIG = {
     'gate-s': 'GATE_SPOT',
     'gate-f': 'GATE_FUTURES',
     'bit-s': 'BITGET_SPOT',
-    'bit-f': 'BITGET_FUTURES'
+    'bit-f': 'BITGET_FUTURES',
+    'ast-s': 'ASTERDEX_SPOT',
+    'ast-f': 'ASTERDEX_FUTURES',
+    'hyp-s': 'HYPERLIQUID_SPOT',
+    'hyp-f': 'HYPERLIQUID_FUTURES'
 };
 
 export default class Heatmap {

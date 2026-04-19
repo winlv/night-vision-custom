@@ -114,7 +114,8 @@ export default class TrendLine {
         if (this.data.type === 'ray') {
             ctx.textAlign = "left";
             ctx.textBaseline = "middle";
-            ctx.fillText(this.data.text, x1 + 10, y1 - 10);
+            const textWidth = ctx.measureText(this.data.text);
+            ctx.fillText(this.data.text, this.core.layout.width - textWidth.width - 10, y1 - 10);
         } else {
             ctx.textAlign = "center";
             ctx.textBaseline = "bottom";
