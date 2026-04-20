@@ -163,11 +163,12 @@ mousedown(event) {
             return;
         }
 
-        if ($core.meta.tool === 'RangeTool' || event.which === 2) {
+        const rangeMode = $core.meta.tool === 'RangeTool' || event.which === 2 || (shift && !$core.meta.drawingMode && !$core.meta.scrollLock);
+        if (rangeMode) {
             shift = true;
         }
         const layout = $core.layout
-        if (state === 'idle' && shift) {
+        if (state === 'idle' && rangeMode) {
             $core.meta.scrollLock = true;
 
             pin1 = {
