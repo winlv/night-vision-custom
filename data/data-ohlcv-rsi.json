@@ -10105,6 +10105,17 @@
           }
         },
         {
+          "name": "Circle",
+          "type": "Circle",
+          "drawingTool": true,
+          "data": [],
+          "props": {
+          },
+          "settings": {
+            "zIndex": 1000
+          }
+        },
+        {
           "name": "Text",
           "type": "Text",
           "drawingTool": true,

@@ -220,6 +220,7 @@
             <li on:click={() => onClick('LineToolHorizontalRay')}>ray</li>
             <li on:click={() => onClick('TrendRay')}>ray2</li>
             <li on:click={() => onClick('Rectangle')}>rectangle</li>
+            <li on:click={() => onClick('Circle')}>circle</li>
             <li on:click={() => onClick('RangeTool')}>measure</li>
             <li on:click={() => onClick('ShortLongPosition')}>shortlong</li>
             <li on:click={() => onClick('LongShortPosition')}>longshort</li>

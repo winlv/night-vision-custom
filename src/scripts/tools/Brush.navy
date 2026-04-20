@@ -1,14 +1,12 @@
-import Brush from "../../core/primitives/navyLib/brush.js";
-
 [OVERLAY name = Brush, ctx = Canvas, version = 1.0.0, author = Dmitry]
 
 prop('color', {type: 'string', def: '#ccc'});
 prop('lineWidth', {type: 'number', def: 2});
 prop('lineType', {type: 'string', def: 'solid'});
 
-let timeId = null;
 let mouseX = 0;
 let brushes = {}
+let selectTimeoutId = null;
 
 function init() {
     $core.dataExt.brushes = $core.data;
@@ -20,8 +18,9 @@ function init() {
 }
 
 function draw(ctx) {
-    if (!$core.dataExt.brushes?.length && brushes) {
-        Object.values(brushes).forEach(x => removeBrush(x.data.uuid))
+    const extUuids = new Set(($core.dataExt.brushes || []).map(b => b.uuid));
+    for (const uuid of Object.keys(brushes)) {
+        if (!extUuids.has(uuid)) delete brushes[uuid];
     }
 
     for (const brush of Object.values(brushes)) {
@@ -35,7 +34,6 @@ function keydown(event) {
         mouseX = $core.mouse.x;
         brushSelected(null);
         $events.emit('update-layout');
-        timeId = setTimeout(newBrush, 0)
         return void 0;
     }
 
@@ -46,8 +44,7 @@ function keydown(event) {
 
     if (event.code === 'Escape') {
         brushSelected(null);
-        setTimeout(($events.emit('drawing-mode-off')))
-
+        $events.emit('drawing-mode-off');
     }
 
     pressedAlt = event.code.toLowerCase().includes('alt');
@@ -65,8 +62,6 @@ function mousedown(event) {
         return void 0;
     }
 
-    // const timeout = $core.meta.tool === 'Brush' ? 0 : 50000;
-    // timeId = setTimeout(newBrush, timeout)
     mouseX = $core.mouse.x;
     brushSelected(null);
     $events.emit('update-layout');
@@ -75,10 +70,11 @@ function mousedown(event) {
 }
 
 function mouseup(event) {
-    // clearTimeout(timeId);
-    // timeId = null;
     propagate('mouseup', event);
-    // $events.emit('drawing-mode-off');
+
+    if ($core.meta.tool === 'Brush') {
+        $events.emit('drawing-mode-off');
+    }
 
     let s = Object.values(brushes).find(x => x.selected);
     if (s) {
@@ -96,17 +92,7 @@ function mousemove(event) {
 }
 
 function mouseMoved() {
-    let d = Math.abs(mouseX - $core.mouse.x)
-    return d > 5
-}
-
-function unfinishedBrushes() {
-    for (const brush of Object.values(brushes)) {
-        if (brush.state === 'dragging') {
-            return true
-        }
-    }
-    return false
+    return Math.abs(mouseX - $core.mouse.x) > 5;
 }
 
 function removeBrush(uuid) {
@@ -123,8 +109,6 @@ function removeBrush(uuid) {
 }
 
 function newBrush() {
-
-    // if (unfinishedBrushes() || mouseMoved()) return
     if (mouseMoved()) {
         return void 0;
     }
@@ -168,6 +152,7 @@ function propagate(name, data) {
 }
 
 function brushSelected($uuid) {
+    clearTimeout(selectTimeoutId);
     if (!$uuid) {
         $events.emit('object-selected', {id: undefined, type: undefined});
     }
@@ -176,7 +161,7 @@ function brushSelected($uuid) {
         const selected = uuid === $uuid;
         brushes[uuid].selected = selected;
         if (selected) {
-            setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'Brush'}));
+            selectTimeoutId = setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'Brush'}));
         }
     }
 

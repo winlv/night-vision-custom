@@ -65,11 +65,8 @@ export default class Brush {
         return this.curve.collision(x, y);
     }
 
-    propagate(name, data) {
-        if (this.state !== 'dragging') {
-            return void 0;
-        }
-
+    recordPoint() {
+        if (this.state !== 'dragging') return;
         this.data.points.push({
             x: this.core.layout.x2time(this.core.cursor.x),
             y: this.core.layout.y2value(this.core.cursor.y)
@@ -77,7 +74,6 @@ export default class Brush {
     }
 
     mousedown(event) {
-        this.propagate('mousedown', event)
         if (this.collision()) {
             if (this.core.meta.tool !== 'Cursor') {
                 return void 0;
@@ -96,7 +92,6 @@ export default class Brush {
 
     mouseup(event) {
         this.state = 'settled';
-        this.propagate('mouseup', event);
         this.drag = {t: undefined, v: undefined};
         this.hover = false;
     }
@@ -123,7 +118,7 @@ export default class Brush {
         }
 
         this.hover = this.collision();
-        this.propagate('mousemove', event);
+        this.recordPoint();
 
         if (this.selected && this.state === 'settled') {
             if (!this.drag.t || !this.drag.v) {

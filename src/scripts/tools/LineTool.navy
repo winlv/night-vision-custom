@@ -14,9 +14,9 @@ let mouseX = 0;
 let lines = {};
 let activeUuid = null;
 let pressedShift = false;
+let selectTimeoutId = null;
 
-init()
-{
+function init() {
     $core.dataExt.lines = $core.data;
 
     // Restore lines from dataExt
@@ -69,6 +69,7 @@ function newLine() {
 }
 
 function lineSelected($uuid) {
+    clearTimeout(selectTimeoutId);
     if (!$uuid) {
         $events.emit('object-selected', {id: undefined, type: undefined});
     }
@@ -77,7 +78,7 @@ function lineSelected($uuid) {
         const selected = uuid === $uuid;
         lines[uuid].selected = selected;
         if (selected) {
-            setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'LineTool'}));
+            selectTimeoutId = setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'LineTool'}));
         }
     }
 
@@ -128,20 +129,6 @@ function mousedown(event) {
 function mousemove(event) {
     pressedShift = event.shiftKey;
     propagate('mousemove', event);
-
-    if ($core.meta.tool !== 'Cursor' && $core.meta.tool !== 'LineTool') return;
-
-    let hoverPin = false;
-    let hoverLine = false;
-
-    for (const line of Object.values(lines)) {
-        if (line.pins.some(p => p.hover())) hoverPin = true;
-        else if (line.collision()) hoverLine = true;
-    }
-
-    if (hoverPin) $core.cursor.style = 'nwse-resize';
-    else if (hoverLine) $core.cursor.style = 'move';
-    else $core.cursor.style = null;
 }
 
 function mouseup(event) {

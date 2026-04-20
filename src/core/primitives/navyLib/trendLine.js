@@ -4,6 +4,7 @@ export default class TrendLine {
         this.core = core;
         this.data = line;
         this.hover = false;
+        this.pinHover = false;
         this.selected = false;
         this.isDragging = false;
         this.lastMousePos = { t: 0, v: 0 };
@@ -13,19 +14,19 @@ export default class TrendLine {
             case 'segment':
                 this.line = new core.lib.Segment(core);
                 this.pins = [
-                    new core.lib.Pin(core, this, 'p1'),
-                    new core.lib.Pin(core, this, 'p2')
+                    new core.lib.Pin(core, this, 'p1', {cursor: 'nwse-resize'}),
+                    new core.lib.Pin(core, this, 'p2', {cursor: 'nwse-resize'})
                 ];
                 break;
             case 'ray':
                 this.line = new core.lib.Ray(core);
-                this.pins = [new core.lib.Pin(core, this, 'p1')];
+                this.pins = [new core.lib.Pin(core, this, 'p1', {cursor: 'nwse-resize'})];
                 break;
             case 'trendRay':
                 this.line = new core.lib.TrendRay(core);
                 this.pins = [
-                    new core.lib.Pin(core, this, 'p1'),
-                    new core.lib.Pin(core, this, 'p2')
+                    new core.lib.Pin(core, this, 'p1', {cursor: 'nwse-resize'}),
+                    new core.lib.Pin(core, this, 'p2', {cursor: 'nwse-resize'})
                 ];
                 break;
         }
@@ -38,34 +39,6 @@ export default class TrendLine {
     draw(ctx) {
         const layout = this.core.layout;
         const color = this.data.color ?? '#dc9800';
-
-        const trackingPinIndex = this.pins.findIndex(p => p.state === 'tracking' || p.state === 'dragging');
-
-        if (this.pressedShift && trackingPinIndex !== -1 && this.data.p1 && this.data.p2) {
-            // anchor - неподвижная точка, moving - та, которую тянем
-            const anchor = trackingPinIndex === 0 ? this.data.p2 : this.data.p1;
-            const moving = trackingPinIndex === 0 ? this.data.p1 : this.data.p2;
-
-            const x1 = layout.time2x(anchor[0]);
-            const y1 = layout.value2y(anchor[1]);
-            const x2 = layout.time2x(moving[0]);
-            const y2 = layout.value2y(moving[1]);
-
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-
-            const angle = Math.atan2(dy, dx);
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            const snapStep = Math.PI / 4;
-            const snappedAngle = Math.round(angle / snapStep) * snapStep;
-
-            const nx2 = x1 + Math.cos(snappedAngle) * dist;
-            const ny2 = y1 + Math.sin(snappedAngle) * dist;
-
-            moving[0] = layout.x2time(nx2);
-            moving[1] = layout.y2value(ny2);
-        }
 
         this.line.update(this.data.p1, this.data.p2);
 
@@ -133,7 +106,7 @@ export default class TrendLine {
         const { x1, y1, x2, y2 } = this.line;
         let iconPosX, iconPosY;
 
-        if (!window.isDigash) {
+        if (!this.core.props.config.IS_DIGASH) {
             const y = y2 < this.core.layout.height ? Math.max(30, y2) : this.core.layout.height;
             let x = x2;
             if (y2 < 0 || y2 > this.core.layout.height) {
@@ -209,7 +182,50 @@ export default class TrendLine {
         const isDrawing = this.pins.some(p => p.state === 'tracking' || p.state === 'dragging');
         if (this.core.meta.tool !== 'Cursor' && !isDrawing) return;
 
+        const Utils = this.core.lib.Utils;
+        if (!Utils.isMobile) {
+            // Body cursor first, then pin overrides (pins sit on the line endpoints)
+            if (this.collision() && this.state !== 'tracking') {
+                event.target.style.cursor = 'move';
+            }
+            if (!this.collision() && this.hover) {
+                event.target.style.cursor = 'default';
+            }
+
+            const pin = this.pins.find(p => p.hover() || p.state === 'dragging');
+            if (pin?.cursor) {
+                event.target.style.cursor = pin.cursor;
+            }
+            if (!pin && this.pinHover) {
+                event.target.style.cursor = 'default';
+            }
+            this.pinHover = !!pin;
+        }
+
         this.hover = this.collision();
         this.propagate('mousemove', event);
+
+        if (this.pressedShift && isDrawing && this.data.p1 && this.data.p2) {
+            const trackingPinIndex = this.pins.findIndex(p => p.state === 'tracking' || p.state === 'dragging');
+            if (trackingPinIndex !== -1) this._applyAngleSnap(trackingPinIndex);
+        }
+    }
+
+    _applyAngleSnap(trackingPinIndex) {
+        const layout = this.core.layout;
+        const anchor = trackingPinIndex === 0 ? this.data.p2 : this.data.p1;
+        const moving = trackingPinIndex === 0 ? this.data.p1 : this.data.p2;
+
+        const ax = layout.time2x(anchor[0]);
+        const ay = layout.value2y(anchor[1]);
+        const mx = layout.time2x(moving[0]);
+        const my = layout.value2y(moving[1]);
+
+        const dx = mx - ax, dy = my - ay;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const snappedAngle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+
+        moving[0] = layout.x2time(ax + Math.cos(snappedAngle) * dist);
+        moving[1] = layout.y2value(ay + Math.sin(snappedAngle) * dist);
     }
 }

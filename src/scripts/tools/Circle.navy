@@ -1,51 +1,41 @@
-[OVERLAY name = Rectangle, ctx = Canvas, version = 1.0.0, author = Dmitry]
+[OVERLAY name = Circle, ctx = Canvas, version = 1.0.0, author = Dmitry]
 
 prop('color', {type: 'string', def: '#cccccc'});
 prop('lineWidth', {type: 'number', def: 2});
 prop('lineType', {type: 'string', def: 'solid'});
 prop('fillColor', {type: 'string', def: '#ffffff'});
-prop('textColor', {type: 'string', def: '#dc9800'});
-prop('textSize', {type: 'number', def: 12});
 
 let timeId = null;
 let mouseX = 0;
-let rectangles = {}
+let circles = {}
 let pressedShift = false;
 let selectTimeoutId = null;
 
 function init() {
-    $core.dataExt.rectangles = $core.data;
+    $core.dataExt.circles = $core.data;
 
-    for (const rectangle of $core.dataExt.rectangles || []) {
-        rectangles[rectangle.uuid] = new $lib.Rectangle($core, rectangle);
-        rectangles[rectangle.uuid].onSelect = rectangleSelected;
+    for (const circle of $core.dataExt.circles || []) {
+        circles[circle.uuid] = new $lib.CircleDrawing($core, circle);
+        circles[circle.uuid].onSelect = circleSelected;
     }
 }
 
 function draw(ctx) {
-    const extUuids = new Set(($core.dataExt.rectangles || []).map(r => r.uuid));
-    for (const uuid of Object.keys(rectangles)) {
-        if (!extUuids.has(uuid)) delete rectangles[uuid];
+    const extUuids = new Set(($core.dataExt.circles || []).map(c => c.uuid));
+    for (const uuid of Object.keys(circles)) {
+        if (!extUuids.has(uuid)) delete circles[uuid];
     }
 
-    for (const rectangle of Object.values(rectangles)) {
-        rectangle.draw(ctx)
+    for (const circle of Object.values(circles)) {
+        circle.draw(ctx)
     }
 }
 
 let pressedAlt = false;
 function keydown(event) {
     if (event.code === 'Backspace' || event.code === 'Delete') {
-        let s = Object.values(rectangles).find(x => x.selected)
-        if (s) removeRectangle(s.data.uuid)
-    }
-
-    if (pressedAlt && event.code === 'KeyR') {
-        timeId = setTimeout(newRectangle, 0)
-
-        mouseX = $core.mouse.x;
-        rectangleSelected(null);
-        $events.emit('update-layout');
+        let s = Object.values(circles).find(x => x.selected)
+        if (s) removeCircle(s.data.uuid)
     }
 
     if (event.code.toLowerCase().includes('alt')) pressedAlt = true;
@@ -67,18 +57,18 @@ function keyup(event) {
 
 function mousedown(event) {
     pressedShift = event.shiftKey;
-    if ($core.meta.tool !== 'Rectangle') {
-        rectangleSelected(null);
+    if ($core.meta.tool !== 'Circle') {
+        circleSelected(null);
         $events.emit('update-layout');
         propagate('mousedown', event);
         return void 0;
     }
 
     mouseX = $core.mouse.x;
-    rectangleSelected(null);
+    circleSelected(null);
     $events.emit('update-layout');
     propagate('mousedown', event);
-    newRectangle();
+    newCircle();
 }
 
 function mouseup(event) {
@@ -86,14 +76,14 @@ function mouseup(event) {
     clearTimeout(timeId)
     timeId = null
     propagate('mouseup', event);
-    if ($core.meta.tool === 'Rectangle') {
+    if ($core.meta.tool === 'Circle') {
         $events.emit('drawing-mode-off');
     }
 
-    let s = Object.values(rectangles).find(x => x.selected);
+    let s = Object.values(circles).find(x => x.selected);
     if (s) {
         $events.emit('change-tool-data', {
-            data: $core.dataExt.rectangles,
+            data: $core.dataExt.circles,
             id: $core.id
         });
     }
@@ -111,83 +101,75 @@ function mouseMoved() {
     return d > 5
 }
 
-function unfinishedRectangles() {
-    return Object.values(rectangles).some(r => r.state === 'tracking' || r.state === 'dragging' || r.pins.some(p => p.state === 'tracking'));
-}
-
-function removeRectangle(uuid) {
-    delete rectangles[uuid]
-    $core.dataExt.rectangles = $core.dataExt.rectangles?.filter(x => x.uuid !== uuid) ?? [];
+function removeCircle(uuid) {
+    delete circles[uuid]
+    $core.dataExt.circles = $core.dataExt.circles?.filter(x => x.uuid !== uuid) ?? [];
     $events.emit('update-layout')
 
     $events.emit('change-tool-data', {
-        data: $core.dataExt.rectangles,
+        data: $core.dataExt.circles,
         id: $core.id
     });
 
     $events.emit('object-selected', {id: undefined, type: undefined});
 }
 
-function newRectangle() {
-    if (unfinishedRectangles() || mouseMoved()) {
+function newCircle() {
+    if (mouseMoved()) {
         return void 0;
     }
 
-    if (!$core.dataExt.rectangles) {
-        $core.dataExt.rectangles = []
+    if (!$core.dataExt.circles) {
+        $core.dataExt.circles = []
     }
 
     let time = $core.layout.x2time($core.cursor.x);
     let yValue = $core.layout.y2value($core.cursor.y);
     let uuid = $lib.Utils.uuid3();
 
-    let rectangle = {
+    let circle = {
         p1: [time, yValue],
         p2: [time, yValue],
-        p3: [time, yValue],
-        p4: [time, yValue],
         lineWidth: $props.lineWidth,
         color: $props.color,
         fillColor: $props.fillColor,
         lineType: $props.lineType,
-        uuid: uuid,
-        textColor: $props.textColor,
-        textSize: $props.textSize,
-        text: ""
+        uuid: uuid
     };
 
-    $core.dataExt.rectangles.push(rectangle);
+    $core.dataExt.circles.push(circle);
 
-    rectangles[uuid] = new $lib.Rectangle($core, rectangle, true);
-    rectangles[uuid].onSelect = rectangleSelected;
-    rectangles[uuid].selected = true;
+    circles[uuid] = new $lib.CircleDrawing($core, circle, true);
+    circles[uuid].onSelect = circleSelected;
+    circles[uuid].selected = true;
+    circles[uuid].state = 'tracking';
 
     $events.emit('scroll-lock', true);
     $events.emit('update-layout');
 
     $events.emit('change-tool-data', {
-        data: $core.dataExt.rectangles,
+        data: $core.dataExt.circles,
         id: $core.id
     });
 }
 
 function propagate(name, data) {
-    for (const rectangle of Object.values(rectangles)) {
-        rectangle[name](data)
+    for (const circle of Object.values(circles)) {
+        circle[name](data)
     }
 }
 
-function rectangleSelected($uuid) {
+function circleSelected($uuid) {
     clearTimeout(selectTimeoutId);
     if (!$uuid) {
         $events.emit('object-selected', {id: undefined, type: undefined});
     }
 
-    for (const uuid in rectangles) {
+    for (const uuid in circles) {
         const selected = uuid === $uuid;
-        rectangles[uuid].selected = selected;
+        circles[uuid].selected = selected;
         if (selected) {
-            selectTimeoutId = setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'Rectangle'}));
+            selectTimeoutId = setTimeout(() => $events.emit('object-selected', {id: uuid, type: 'Circle'}));
         }
     }
 

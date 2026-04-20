@@ -26,28 +26,6 @@ export default class Rectangle {
     draw(ctx) {
         const strokeStyle = this.data.color ?? '#dc9800';
 
-        const trackingPinIndex = this.pins.findIndex(pin => pin.state === 'tracking' || pin.state === 'dragging');
-        if (this.pressedShift && trackingPinIndex !== -1) {
-            const layout = this.core.layout;
-            const anchorProp = trackingPinIndex === 0 ? 'p2' : 'p1';
-            const movingProp = trackingPinIndex === 0 ? 'p1' : 'p2';
-
-            const x1 = layout.time2x(this.data[anchorProp][0]);
-            const y1 = layout.value2y(this.data[anchorProp][1]);
-            const x2 = layout.time2x(this.data[movingProp][0]);
-            const y2 = layout.value2y(this.data[movingProp][1]);
-
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-            const size = Math.max(Math.abs(dx), Math.abs(dy));
-
-            const nx2 = x1 + Math.sign(dx) * size;
-            const ny2 = y1 + Math.sign(dy) * size;
-
-            this.data[movingProp][0] = layout.x2time(nx2);
-            this.data[movingProp][1] = layout.y2value(ny2);
-        }
-
         this.rectangle.update(this.data.p1, this.data.p2)
         ctx.lineWidth = this.data.lineWidth ?? 1;
         ctx.strokeStyle = strokeStyle;
@@ -169,6 +147,11 @@ export default class Rectangle {
 
         this.propagate('mousemove', event)
 
+        if (this.pressedShift) {
+            const trackingPinIndex = this.pins.findIndex(p => p.state === 'tracking' || p.state === 'dragging');
+            if (trackingPinIndex !== -1) this._applySquareConstraint(trackingPinIndex);
+        }
+
         if (this.selected && this.state === 'settled') {
             if (!this.drag.t || !this.drag.v) {
                 return;
@@ -196,5 +179,22 @@ export default class Rectangle {
             this.data.p3 = newP3;
             this.data.p4 = newP4;
         }
+    }
+
+    _applySquareConstraint(trackingPinIndex) {
+        const layout = this.core.layout;
+        const anchorProp = trackingPinIndex === 0 ? 'p2' : 'p1';
+        const movingProp = trackingPinIndex === 0 ? 'p1' : 'p2';
+
+        const ax = layout.time2x(this.data[anchorProp][0]);
+        const ay = layout.value2y(this.data[anchorProp][1]);
+        const mx = layout.time2x(this.data[movingProp][0]);
+        const my = layout.value2y(this.data[movingProp][1]);
+
+        const dx = mx - ax, dy = my - ay;
+        const size = Math.max(Math.abs(dx), Math.abs(dy));
+
+        this.data[movingProp][0] = layout.x2time(ax + Math.sign(dx) * size);
+        this.data[movingProp][1] = layout.y2value(ay + Math.sign(dy) * size);
     }
 }
