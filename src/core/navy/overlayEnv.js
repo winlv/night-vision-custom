@@ -39,6 +39,7 @@ import FibRetracementShape from "../primitives/navyLib/fibRetracementShape.js";
 import TrendRay from "../primitives/navyLib/trendRay.js"
 import CircleDrawing from "../primitives/navyLib/circleDrawing.js"
 import CircleShape from "../primitives/navyLib/circleShape.js";
+import VolumeProfileRange from "../primitives/navyLib/volumeProfileRange.js";
 
 const formatCash = Utils.formatCash
 
@@ -74,6 +75,7 @@ export default class OverlayEnv {
             TrendLine, Segment, TrendRay, Pin, Ray, Brush, Curve, Rectangle, RectangleShape, RectanglePin, ShortLongPosition, ShortLongPositionShape,
             FibRetracement, FibRetracementShape, Text,
             CircleDrawing, CircleShape,
+            VolumeProfileRange,
             Utils
         }
 

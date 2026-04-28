@@ -143,7 +143,7 @@ export default class TrendLine {
         this.propagate('mousedown', event);
         const pinActive = this.pins.some(p => p.state === 'dragging' || p.state === 'tracking');
 
-        if (!pinActive && this.collision()) {
+        if (!pinActive && this.collision() && this.selected) {
             if (this.core.meta.tool !== 'Cursor') return;
             this.isDragging = true;
             this.lastMousePos = {
@@ -166,6 +166,11 @@ export default class TrendLine {
         this.pressedShift = event.shiftKey;
 
         if (this.isDragging) {
+            if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
+                this.isDragging = false;
+                this.core.events.emit('scroll-lock', false);
+                return;
+            }
             const currentT = this.core.cursor.time;
             const currentV = this.core.layout.y2value(this.core.mouse.y);
             const dt = currentT - this.lastMousePos.t;

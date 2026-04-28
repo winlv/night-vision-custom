@@ -84,6 +84,15 @@
 
         chart.meta.initHeatmap('test');
 
+        chart.data.panes[0].overlays.push({
+            name: 'VolumeProfileRange',
+            type: 'VolumeProfileRange',
+            data: [],
+            props: {},
+            settings: { zIndex: 1 }
+        });
+        chart.update();
+
         // chart.meta.scrollLock = true;
         // chart.data = data3
         window.chart = chart
@@ -173,6 +182,12 @@
         }, 1000)
     }
 
+    document.addEventListener('contextmenu', (event) => {
+        console.log(event);
+        event.preventDefault();
+        event.stopPropagation();
+    })
+
 </script>
 <style>
     .app {
@@ -226,6 +241,7 @@
             <li on:click={() => onClick('LongShortPosition')}>longshort</li>
             <li on:click={() => onClick('FibRetracement')}>fibRetracement</li>
             <li on:click={() => onClick('Text')}>Text</li>
+            <li on:click={() => onClick('VolumeProfileRange')}>VP Range</li>
             <li on:click={() => onClick('Remove')}>Remove</li>
             <li on:click={() => onClick('Magnet')}>magnet</li>
             <li on:click={() => redraw('redraw')}>redraw</li>

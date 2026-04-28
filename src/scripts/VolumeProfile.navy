@@ -1,0 +1,90 @@
+[OVERLAY name = VolumeProfile, ctx = Canvas, author = Tradehive, version = 1.0.0]
+
+prop('bins', {  type: 'number', def: 60 });
+prop('barSize', {  type: 'number', def: 1 });
+prop('buyColor', {  type: 'color', def: '#466BE4' });
+prop('sellColor', {  type: 'color', def: '#E81F58' });
+prop('lineColor', {  type: 'color', def: '#001aff' });
+prop('showPOC', {  type: 'boolean', def: 'true' });
+
+function draw(ctx) {
+  const layout = $core.layout;
+  const view = $core.hub.mainOv.dataView;
+  const candles = $core.hub.mainOv.data.slice(view.i1, view.i2 + 1);
+
+  if (!candles || candles.length === 0) return;
+
+  const bins = $props.bins;
+
+  const minPrice = Math.min(...candles.map(c => c[3]));
+  const maxPrice = Math.max(...candles.map(c => c[2]));
+  const binSize = (maxPrice - minPrice) / bins;
+
+  const buyVolumes = new Array(bins).fill(0);
+  const sellVolumes = new Array(bins).fill(0);
+
+  candles.forEach((c) => {
+    const low = c[3];
+    const high = c[2];
+    const buyVol = c[6] || c[5] * 0.5;
+    const sellVol = c[7] || c[5] * 0.5;
+
+    const startBin = Math.floor((low - minPrice) / binSize);
+    const endBin = Math.floor((high - minPrice) / binSize);
+
+    for (let i = startBin; i <= endBin; i++) {
+      if (i >= 0 && i < bins) {
+        buyVolumes[i] += buyVol / (endBin - startBin + 1);
+        sellVolumes[i] += sellVol / (endBin - startBin + 1);
+      }
+    }
+  });
+
+  const totalVolumes = buyVolumes.map((b, i) => b + sellVolumes[i]);
+  const maxVol = Math.max(...totalVolumes);
+  const pocIndex = totalVolumes.indexOf(maxVol);
+
+  const chartRight = layout.width;
+
+  for (let i = 0; i < bins; i++) {
+    const buyVol = buyVolumes[i];
+    const sellVol = sellVolumes[i];
+    const total = buyVol + sellVol;
+
+    const yTop = layout.value2y(minPrice + i * binSize);
+    const yBottom = layout.value2y(minPrice + (i + 1) * binSize);
+    const barHeight = yBottom - yTop;
+
+    const buyWidth = (buyVol / maxVol) * (100 * $props.barSize);
+    const sellWidth = (sellVol / maxVol) * (100 * $props.barSize);
+
+    ctx.fillStyle = $props.sellColor + 60;
+    ctx.fillRect(chartRight - sellWidth, yTop, sellWidth, barHeight);
+
+    ctx.fillStyle = $props.buyColor + 60;
+    ctx.fillRect(chartRight - sellWidth - buyWidth, yTop, buyWidth, barHeight);
+  }
+
+  if ($props.showPOC) {
+    const yTop = layout.value2y(minPrice + pocIndex * binSize);
+    const yBottom = layout.value2y(minPrice + (pocIndex + 1) * binSize);
+    const pocY = (yTop + yBottom) / 2;
+
+    ctx.strokeStyle = $props.lineColor;
+    ctx.lineWidth = .5;
+    ctx.beginPath();
+    const xStart = layout.ti2x(candles[0][0], 0);
+    const xEnd = layout.width;
+    ctx.moveTo(xStart, pocY);
+    ctx.lineTo(xEnd, pocY);
+    ctx.stroke();
+  }
+}
+
+function yRange() {
+  return null;
+}
+
+function legend(x) {
+  return ''
+}

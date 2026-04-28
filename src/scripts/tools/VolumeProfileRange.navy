@@ -1,0 +1,184 @@
+[OVERLAY name = VolumeProfileRange, ctx = Canvas, version = 1.0.0, author = Dmitry]
+
+prop('bins', {type: 'number', def: 60});
+prop('buyColor', {type: 'color', def: '#466BE4'});
+prop('sellColor', {type: 'color', def: '#E81F58'});
+prop('pocColor', {type: 'color', def: '#7EB8F7'});
+prop('showPOC', {type: 'boolean', def: true});
+prop('borderColor', {type: 'string', def: '#cccccc'});
+prop('lineWidth', {type: 'number', def: 1});
+
+let timeId = null;
+let mouseX = 0;
+let rectangles = {};
+let selectTimeoutId = null;
+
+function init() {
+    $core.dataExt.rectangles = $core.data;
+
+    for (const item of $core.dataExt.rectangles || []) {
+        rectangles[item.uuid] = new $lib.VolumeProfileRange($core, item);
+        rectangles[item.uuid].onSelect = rangeSelected;
+    }
+}
+
+function draw(ctx) {
+    const extUuids = new Set(($core.dataExt.rectangles || []).map(r => r.uuid));
+    for (const uuid of Object.keys(rectangles)) {
+        if (!extUuids.has(uuid)) delete rectangles[uuid];
+    }
+
+    for (const rect of Object.values(rectangles)) {
+        rect.draw(ctx);
+    }
+}
+
+let pressedAlt = false;
+function keydown(event) {
+    if (event.code === 'Backspace' || event.code === 'Delete') {
+        let s = Object.values(rectangles).find(x => x.selected);
+        if (s) removeVPRange(s.data.uuid);
+    }
+
+    if (event.code.toLowerCase().includes('alt')) pressedAlt = true;
+}
+
+function keyup(event) {
+    if (event.code.toLowerCase().includes('alt')) pressedAlt = false;
+}
+
+function mousedown(event) {
+    if ($core.meta.tool !== 'VolumeProfileRange') {
+        rangeSelected(null);
+        $events.emit('update-layout');
+        propagate('mousedown', event);
+        return void 0;
+    }
+
+    mouseX = $core.mouse.x;
+    rangeSelected(null);
+    $events.emit('update-layout');
+    propagate('mousedown', event);
+    newVPRange();
+}
+
+function mouseup(event) {
+    clearTimeout(timeId);
+    timeId = null;
+    propagate('mouseup', event);
+    if ($core.meta.tool === 'VolumeProfileRange') {
+        $events.emit('drawing-mode-off');
+    }
+
+    let s = Object.values(rectangles).find(x => x.selected);
+    if (s) {
+        $events.emit('change-tool-data', {
+            data: $core.dataExt.rectangles,
+            id: $core.id
+        });
+    }
+
+    $events.emit('scroll-lock', false);
+}
+
+function mousemove(event) {
+    propagate('mousemove', event);
+}
+
+function mouseMoved() {
+    return Math.abs(mouseX - $core.mouse.x) > 5;
+}
+
+function unfinished() {
+    return Object.values(rectangles).some(r =>
+        r.state === 'tracking' || r.state === 'dragging' ||
+        r.pins.some(p => p.state === 'tracking')
+    );
+}
+
+function removeVPRange(uuid) {
+    delete rectangles[uuid];
+    $core.dataExt.rectangles = $core.dataExt.rectangles?.filter(x => x.uuid !== uuid) ?? [];
+    $events.emit('update-layout');
+
+    $events.emit('change-tool-data', {
+        data: $core.dataExt.rectangles,
+        id: $core.id
+    });
+
+    $events.emit('object-selected', {id: undefined, type: undefined});
+}
+
+function newVPRange() {
+    if (unfinished() || mouseMoved()) return void 0;
+
+    if (!$core.dataExt.rectangles) {
+        $core.dataExt.rectangles = [];
+    }
+
+    const time = $core.layout.x2time($core.cursor.x);
+    const yValue = $core.layout.y2value($core.cursor.y);
+    const uuid = $lib.Utils.uuid3();
+
+    const item = {
+        p1: [time, yValue],
+        p2: [time, yValue],
+        p3: [time, yValue],
+        p4: [time, yValue],
+        bins: $props.bins,
+        buyColor: $props.buyColor,
+        sellColor: $props.sellColor,
+        pocColor: $props.pocColor,
+        showPOC: $props.showPOC,
+        borderColor: $props.borderColor,
+        lineWidth: $props.lineWidth,
+        uuid: uuid
+    };
+
+    $core.dataExt.rectangles.push(item);
+
+    rectangles[uuid] = new $lib.VolumeProfileRange($core, item, true);
+    rectangles[uuid].onSelect = rangeSelected;
+    rectangles[uuid].selected = true;
+
+    $events.emit('scroll-lock', true);
+    $events.emit('update-layout');
+
+    $events.emit('change-tool-data', {
+        data: $core.dataExt.rectangles,
+        id: $core.id
+    });
+}
+
+function propagate(name, data) {
+    for (const rect of Object.values(rectangles)) {
+        rect[name](data);
+    }
+}
+
+function rangeSelected($uuid) {
+    clearTimeout(selectTimeoutId);
+    if (!$uuid) {
+        $events.emit('object-selected', {id: undefined, type: undefined});
+    }
+
+    for (const uuid in rectangles) {
+        const selected = uuid === $uuid;
+        rectangles[uuid].selected = selected;
+        if (selected) {
+            selectTimeoutId = setTimeout(() =>
+                $events.emit('object-selected', {id: uuid, type: 'VolumeProfileRange'})
+            );
+        }
+    }
+
+    $events.emit('update-layout');
+}
+
+function legend() {
+    return '';
+}
+
+function yRange() {
+    return null;
+}
