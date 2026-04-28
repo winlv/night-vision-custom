@@ -16816,7 +16816,17 @@
                     "props": {
                         "color": "orange"
                     }
+                },
+              {
+                "name": "RangeTool",
+                "type": "RangeTool",
+                "drawingTool": true,
+                "data": [],
+                "props": {},
+                "settings": {
+                  "zIndex": 1000
                 }
+              }
             ]
         },
         {
@@ -50446,7 +50456,17 @@
                     "props": {
                         "color": "darkcyan"
                     }
+                },
+              {
+                "name": "RangeTool",
+                "type": "RangeTool",
+                "drawingTool": true,
+                "data": [],
+                "props": {},
+                "settings": {
+                  "zIndex": 1000
                 }
+              }
             ]
         }
     ]

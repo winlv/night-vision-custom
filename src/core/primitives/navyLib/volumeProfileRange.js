@@ -11,6 +11,8 @@ export default class VolumeProfileRange {
         this.onSelect = () => {};
         this.state = 'settled';
 
+        this._barRects = [];
+
         this.shape = new core.lib.RectangleShape(core);
         this.pins = [
             new core.lib.Pin(core, this, 'p1', {cursor: 'nwse-resize'}),
@@ -37,6 +39,12 @@ export default class VolumeProfileRange {
         const height = bottom - top;
 
         const borderColor = this.data.borderColor || '#cccccc';
+
+        // Transparent background showing the tool's viewport
+        ctx.save();
+        ctx.fillStyle = borderColor + '18';
+        ctx.fillRect(left, top, width, height);
+        ctx.restore();
 
         if (width > 2 && height > 2) {
             this._drawBars(ctx, layout, left, right, top, bottom, width);
@@ -111,6 +119,8 @@ export default class VolumeProfileRange {
         const buyColor  = this.data.buyColor  || '#466BE4';
         const sellColor = this.data.sellColor || '#E81F58';
 
+        this._barRects = [];
+
         ctx.save();
         ctx.beginPath();
         ctx.rect(left, top, right - left, bottom - top);
@@ -123,6 +133,14 @@ export default class VolumeProfileRange {
 
             const buyW  = (buyVolumes[i]  / maxVol) * width * 0.5;
             const sellW = (sellVolumes[i] / maxVol) * width * 0.5;
+            const totalW = buyW + sellW;
+
+            if (totalW > 0) {
+                this._barRects.push({
+                    x1: left, x2: left + totalW,
+                    y1: yTop, y2: yBottom
+                });
+            }
 
             ctx.fillStyle = buyColor + '60';
             ctx.fillRect(left, yTop, buyW, barH);
@@ -150,7 +168,17 @@ export default class VolumeProfileRange {
 
     collision() {
         const mouse = this.core.mouse;
-        return this.shape.collision(mouse.x, mouse.y);
+        const mx = mouse.x, my = mouse.y;
+
+        // While drawing (no bars yet), fall back to full rectangle
+        if (this.state === 'tracking' || this._barRects.length === 0) {
+            return this.shape.collision(mx, my);
+        }
+
+        for (const r of this._barRects) {
+            if (mx >= r.x1 && mx <= r.x2 && my >= r.y1 && my <= r.y2) return true;
+        }
+        return false;
     }
 
     propagate(name, event) {
