@@ -5,8 +5,8 @@
     import.meta.hot
     import {NightVision} from './index.js'
     import {onMount} from 'svelte'
-    // import data from '../data/data-ohlcv.json?id=main'
-    import data from '../data/data-ohlcv-rsi.json?id=main'
+    import data from '../data/data-ohlcv.json?id=main'
+    // import data from '../data/data-ohlcv-rsi.json?id=main'
     // import data from '../data/data-area.json?id=main-2'
     // import data from '../data/data-scales'
     import TestStack from '../tests/testStack.js'
@@ -73,6 +73,7 @@
                 MAX_ZOOM: Infinity,
                 MIN_ZOOM: 5,
                 DEFAULT_LEN: 250,
+                DRAW_SIGNAL_LEVEL_BUTTON: false,
                 meta: {
                     scrollLock: true
                 }
@@ -244,6 +245,7 @@
             <li on:click={() => onClick('VolumeProfileRange')}>VP Range</li>
             <li on:click={() => onClick('Remove')}>Remove</li>
             <li on:click={() => onClick('Magnet')}>magnet</li>
+            <li on:click={() => onClick('ZoomTool')}>ZoomTool</li>
             <li on:click={() => redraw('redraw')}>redraw</li>
         </ul>
     </div>

@@ -44,7 +44,9 @@ const EXCHANGES_CONFIG = {
     'ast-s': 'ASTERDEX_SPOT',
     'ast-f': 'ASTERDEX_FUTURES',
     'hyp-s': 'HYPERLIQUID_SPOT',
-    'hyp-f': 'HYPERLIQUID_FUTURES'
+    'hyp-f': 'HYPERLIQUID_FUTURES',
+    'kuc-s': 'KUCOIN_SPOT',
+    'kuc-f': 'KUCOIN_FUTURES'
 };
 
 export default class Heatmap {
@@ -124,6 +126,8 @@ export default class Heatmap {
 
         this.palettes = { asks: {}, bids: {} };
 
+        console.log(maxVolumesMap);
+
         for (const [exName, maxVol] of Object.entries(maxVolumesMap)) {
             const askPal = new Float32Array(this.PALETTE_SIZE * 4);
             const bidPal = new Float32Array(this.PALETTE_SIZE * 4);
@@ -150,7 +154,7 @@ export default class Heatmap {
     }
 
     updateData(data, layout, props, colorScaleAsks, colorScaleBids, aggStep, exchange, maxVolumesMap, fullRedraw = false) {
-        if (!this.instancedMesh || !data.length) return;
+        if (!this.instancedMesh || !data?.length) return;
 
         this.updatePalettes(colorScaleAsks, colorScaleBids, maxVolumesMap);
 
@@ -194,6 +198,7 @@ export default class Heatmap {
                     const exId = orders[j + 2];
                     const palette = paletteMap[exId];
                     if (!palette) continue;
+
 
                     const maxVol = maxVolumesMap[EXCHANGES_CONFIG[exId]] || 100000;
                     const intensity = (price * qty) / maxVol;

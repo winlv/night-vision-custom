@@ -4,13 +4,15 @@ prop('colorScaleAsks', {type: 'string', def: {
         'BINANCE_FUTURES': (value) => gradient(value, 'asks')(value),
         'BINANCE_SPOT': (value) => gradient(value, 'asks')(value),
         'BYBIT_SPOT': (value) => gradient(value, 'asks')(value),
-        'OKX_SPOT': (value) => gradient(value, 'asks')(value)
+        'OKX_SPOT': (value) => gradient(value, 'asks')(value),
+        'KUCOIN_FUTURES': (value) => gradient(value, 'asks')(value),
     }});
 prop('colorScaleBids', {type: 'string', def: {
-        'BINANCE_FUTURES': (value) => gradient(value, 'asks')(value),
-        'BINANCE_SPOT': (value) => gradient(value, 'asks')(value),
-        'BYBIT_SPOT': (value) => gradient(value, 'asks')(value),
-        'OKX_SPOT': (value) => gradient(value, 'asks')(value)
+        'BINANCE_FUTURES': (value) => gradient(value, 'bids')(value),
+        'BINANCE_SPOT': (value) => gradient(value, 'bids')(value),
+        'BYBIT_SPOT': (value) => gradient(value, 'bids')(value),
+        'OKX_SPOT': (value) => gradient(value, 'bids')(value),
+        'KUCOIN_FUTURES': (value) => gradient(value, 'bids')(value),
     }});
 
 prop('showLabels',     { type: 'boolean', def: true });
@@ -44,7 +46,9 @@ const EXCHANGES_CONFIG = {
     'gate-s': 'GATE_SPOT',
     'gate-f': 'GATE_FUTURES',
     'bit-s': 'BITGET_SPOT',
-    'bit-f': 'BITGET_FUTURES'
+    'bit-f': 'BITGET_FUTURES',
+    'kuc-s': 'KUCOIN_SPOT',
+    'kuc-f': 'KUCOIN_FUTURES'
 };
 
 function init() {
@@ -330,6 +334,10 @@ const getExchangeName = exchangeId => {
             return 'BITGET_SPOT';
         case 'bit-f':
             return 'BITGET_FUTURES';
+        case 'kuc-s':
+            return 'KUCOIN_SPOT';
+        case 'kuc-f':
+            return 'KUCOIN_FUTURES';
         default:
             return 'UNKNOWN_EXCHANGE';
     }

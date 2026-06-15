@@ -53,13 +53,17 @@ export default function Scale(id, src, specs) {
             }
 
         }
+        self.compact = ovs.some(ov => ov.props && ov.props.compactSidebar)
         if (!isFinite(self.$hi) || !isFinite(self.$lo) ) {
             self.sb = props.config.SBMIN
             return
         }
         let lens = []
-        lens.push(self.$hi.toFixed(self.prec).length)
-        lens.push(self.$lo.toFixed(self.prec).length)
+        let fmt = self.compact
+            ? v => String(Utils.formatCash(v))
+            : v => v.toFixed(self.prec)
+        lens.push(fmt(self.$hi).length)
+        lens.push(fmt(self.$lo).length)
         let str = '0'.repeat(Math.max(...lens)) + '    '
         self.sb = ctx.measureText(str).width
         self.sb = Math.max(Math.floor(self.sb), props.config.SBMIN)

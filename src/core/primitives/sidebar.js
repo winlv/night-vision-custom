@@ -30,7 +30,8 @@ function body(props, layout, scale, side, ctx) {
         var offst = side === 'left' ? -10 : 10
         ctx.textAlign = side === 'left' ? 'end' : 'start'
         let d = scale.prec
-        ctx.fillText(p[1].toFixed(d), x1 + offst, p[0] + 4)
+        let lbl = scale.compact ? Utils.formatCash(p[1]) : p[1].toFixed(d)
+        ctx.fillText(lbl, x1 + offst, p[0] + 4)
     }
 
     ctx.stroke()
@@ -82,7 +83,7 @@ function panel(props, layout, scale, side, ctx) {
 
     const panHeight = props.config.PANHEIGHT
     let $ = props.cursor.scales[scale.scaleSpecs.id] || 0
-    let lbl = $.toFixed(scale.prec)
+    let lbl = scale.compact ? Utils.formatCash($) : $.toFixed(scale.prec)
     ctx.fillStyle = props.colors.panel
     var S = side === 'right' ? 1 : 0
     let panWidth = layout.sbMax[S] - 5
@@ -100,7 +101,7 @@ function tracker(props, layout, scale, side, ctx, tracker) {
     const panHeight = Math.floor(props.config.PANHEIGHT * 0.8)
     const ct = props.config.CANDLE_TIME && props.timeFrame >= Const.MINUTE
     let $ = tracker.value
-    let lbl = $.toFixed(scale.prec)
+    let lbl = scale.compact ? Utils.formatCash($) : $.toFixed(scale.prec)
     ctx.fillStyle = tracker.color
     var S = side === 'right' ? 1 : 0
     let panWidth = layout.sbMax[S] - 5

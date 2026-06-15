@@ -23,6 +23,7 @@ prop('colorAvgVol', { type: 'color', def: '#1cccb777'})
 prop('scaleSymbol', { type: 'string|boolean', def: false })
 prop('priceLine', { type: 'boolean', def: true })
 prop('showValueTracker', { type: 'boolean', def: true })
+prop('compactSidebar', { type: 'boolean', def: false })
 
 
 // Draw call

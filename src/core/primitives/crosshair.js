@@ -93,7 +93,7 @@ export default class Crosshair extends Layer {
         ctx.lineTo(cursor.x, this.layout.height);
         ctx.stroke();
 
-        if (this.layout.main && cursor.gridId === this.layout.id) {
+        if (this.layout.main && cursor.gridId === this.layout.id && this.props.config.DRAW_SIGNAL_LEVEL_BUTTON) {
             this.drawAddSignalLevelButton(ctx, cursor);
         }
 

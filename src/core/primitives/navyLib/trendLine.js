@@ -228,9 +228,21 @@ export default class TrendLine {
 
         const dx = mx - ax, dy = my - ay;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const snappedAngle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+        const step = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+        const snappedAngle = step * (Math.PI / 4);
 
-        moving[0] = layout.x2time(ax + Math.cos(snappedAngle) * dist);
-        moving[1] = layout.y2value(ay + Math.sin(snappedAngle) * dist);
+        const isHorizontal = step === 0 || step === 4 || step === -4;
+        const isVertical = step === 2 || step === -2;
+
+        if (isHorizontal) {
+            moving[0] = layout.x2time(ax + Math.cos(snappedAngle) * dist);
+            moving[1] = anchor[1];
+        } else if (isVertical) {
+            moving[0] = anchor[0];
+            moving[1] = layout.y2value(ay + Math.sin(snappedAngle) * dist);
+        } else {
+            moving[0] = layout.x2time(ax + Math.cos(snappedAngle) * dist);
+            moving[1] = layout.y2value(ay + Math.sin(snappedAngle) * dist);
+        }
     }
 }

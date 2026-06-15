@@ -87,6 +87,7 @@ const ChartConfig = {
     CANDLE_TIME: true, // Show remaining candle time
     DOUBLE_CLICK_ALERT: false,
     IS_DIGASH: false,
+    DRAW_SIGNAL_LEVEL_BUTTON: true,
     ZOOM_X_SENS: 0.5,
     ZOOM_Y_SENS: 0.4
 }
