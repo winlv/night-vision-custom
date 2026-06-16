@@ -1,0 +1,244 @@
+// Navy ~ 0.2-lite
+// <ds>Parallel channel — 3 clicks: base line (p1→p2), then channel width (p3)</ds>
+
+[OVERLAY name = ParallelChannel, ctx = Canvas, version = 1.0.0, author = Claude]
+
+prop('color', {type: 'string', def: '#dc9800'});
+prop('lineWidth', {type: 'number', def: 2});
+prop('lineType', {type: 'string', def: 'solid'});
+prop('fillColor', {type: 'string', def: '#dc9800'});
+prop('backOpacity', {type: 'number', def: 0.12});
+
+let channels = {}          // uuid -> channel state {data, selected, hover}
+let stage = 'idle'         // idle | base | offset
+let currentUuid = null
+let activePin = null       // {uuid, idx} 1|2|3 while dragging a pin
+let dragWhole = null       // {uuid, t, v} while moving the whole channel
+let selectTimeoutId = null
+
+function init() {
+    $core.dataExt.channels = $core.data || [];
+    channels = {}
+    for (const ch of $core.dataExt.channels) {
+        channels[ch.uuid] = { data: ch, selected: false, hover: false }
+    }
+}
+
+// --- geometry helpers ---
+let baseValueAt = (d, t) => {
+    let dt = d.p2.t - d.p1.t
+    if (!dt) return d.p1.v
+    return d.p1.v + (d.p2.v - d.p1.v) * (t - d.p1.t) / dt
+}
+// vertical (value) gap between the base line and p3
+let offsetV = (d) => d.p3.v - baseValueAt(d, d.p3.t)
+
+let getMouse = (e) => [e.layerX, e.layerY]
+let pinHover = (x, y, mx, my) => ((x-mx)*(x-mx) + (y-my)*(y-my)) < 60
+let segHit = (mx, my, ax, ay, bx, by) => Math2.point2seg([mx, my], [ax, ay], [bx, by]) < 7
+
+function draw(ctx) {
+    const layout = $core.layout
+
+    // Sync deleted uuids (object tree / removeTool)
+    const extUuids = new Set(($core.dataExt.channels || []).map(c => c.uuid))
+    for (const uuid of Object.keys(channels)) {
+        if (!extUuids.has(uuid)) delete channels[uuid]
+    }
+    // Pick up externally-added channels
+    for (const ch of ($core.dataExt.channels || [])) {
+        if (!channels[ch.uuid]) channels[ch.uuid] = { data: ch, selected: false, hover: false }
+    }
+
+    for (const c of Object.values(channels)) {
+        let d = c.data
+        if (d.hidden) continue
+        if (!d.p1 || !d.p2 || !d.p3) continue
+
+        let dv = offsetV(d)
+        let x1 = layout.time2x(d.p1.t), y1 = layout.value2y(d.p1.v)
+        let x2 = layout.time2x(d.p2.t), y2 = layout.value2y(d.p2.v)
+        let y1b = layout.value2y(d.p1.v + dv)
+        let y2b = layout.value2y(d.p2.v + dv)
+        let x3 = layout.time2x(d.p3.t), y3 = layout.value2y(d.p3.v)
+
+        c._coords = { x1, y1, x2, y2, y1b, y2b, x3, y3 }
+
+        // Fill between the two parallel lines
+        ctx.beginPath()
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2)
+        ctx.lineTo(x2, y2b); ctx.lineTo(x1, y1b)
+        ctx.closePath()
+        ctx.globalAlpha = $props.backOpacity
+        ctx.fillStyle = d.fillColor || $props.fillColor
+        ctx.fill()
+        ctx.globalAlpha = 1
+
+        // Lines
+        ctx.strokeStyle = d.color || $props.color
+        ctx.lineWidth = d.lineWidth || $props.lineWidth
+        ctx.setLineDash(d.lineType === 'dashed' ? [8] : d.lineType === 'dotted' ? [2] : [0, 0])
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(x1, y1b); ctx.lineTo(x2, y2b); ctx.stroke()
+        ctx.setLineDash([0, 0])
+
+        if (c.selected || c.hover || $core.meta.selectedTool === d.uuid || stage !== 'idle') {
+            drawPin(ctx, x1, y1); drawPin(ctx, x2, y2); drawPin(ctx, x3, y3)
+        }
+    }
+}
+
+function drawPin(ctx, x, y) {
+    ctx.beginPath()
+    ctx.setLineDash([0, 0])
+    ctx.strokeStyle = $props.color
+    ctx.fillStyle = $core.props.colors.back
+    ctx.arc(x, y, 5, 0, Math.PI * 2)
+    ctx.fill(); ctx.stroke(); ctx.closePath()
+}
+
+function newChannel() {
+    if (!$core.dataExt.channels) $core.dataExt.channels = []
+    let t = $core.cursor.time
+    let v = $core.layout.y2value($core.cursor.y)
+    let uuid = $lib.Utils.uuid3()
+    let d = {
+        uuid,
+        p1: {t, v}, p2: {t, v}, p3: {t, v},
+        color: $props.color, fillColor: $props.fillColor,
+        lineWidth: $props.lineWidth, lineType: $props.lineType
+    }
+    $core.dataExt.channels.push(d)
+    channels[uuid] = { data: d, selected: true, hover: false }
+    currentUuid = uuid
+    $events.emit('scroll-lock', true)
+    commit()
+}
+
+function removeChannel(uuid) {
+    delete channels[uuid]
+    $core.dataExt.channels = ($core.dataExt.channels || []).filter(c => c.uuid !== uuid)
+    commit()
+    $events.emit('object-selected', {id: undefined, type: undefined})
+    $events.emit('update-layout')
+}
+
+function commit() {
+    $events.emit('change-tool-data', { data: $core.dataExt.channels, id: $core.id })
+    $events.emit('update-layout')
+}
+
+function deselectAll() {
+    for (const c of Object.values(channels)) c.selected = false
+}
+
+function mousedown(event) {
+    if (event.which === 3) return
+    const layout = $core.layout
+    const [mx, my] = getMouse(event)
+
+    // Active drawing tool: place points across 3 clicks
+    if ($core.meta.tool === 'ParallelChannel') {
+        if (stage === 'idle') {
+            deselectAll()
+            newChannel()
+            stage = 'base'
+            $events.emit('update-layout')
+            return
+        }
+        if (stage === 'base') { stage = 'offset'; return }
+        if (stage === 'offset') {
+            stage = 'idle'
+            currentUuid = null
+            $events.emit('drawing-mode-off')
+            commit()
+            $events.emit('scroll-lock', false)
+            return
+        }
+    }
+
+    // Cursor mode: hit-test pins / lines for selection + drag
+    deselectAll()
+    activePin = null; dragWhole = null
+    for (const c of Object.values(channels)) {
+        if (c.data.locked || c.data.hidden) continue
+        let q = c._coords; if (!q) continue
+        if (pinHover(q.x1, q.y1, mx, my)) { activePin = {uuid: c.data.uuid, idx: 1} }
+        else if (pinHover(q.x2, q.y2, mx, my)) { activePin = {uuid: c.data.uuid, idx: 2} }
+        else if (pinHover(q.x3, q.y3, mx, my)) { activePin = {uuid: c.data.uuid, idx: 3} }
+        else if (segHit(mx, my, q.x1, q.y1, q.x2, q.y2) || segHit(mx, my, q.x1, q.y1b, q.x2, q.y2b)) {
+            dragWhole = {uuid: c.data.uuid, t: $core.cursor.time, v: layout.y2value(my)}
+        }
+        if (activePin || dragWhole) {
+            c.selected = true
+            let id = c.data.uuid
+            setTimeout(() => $events.emit('object-selected', {id, type: 'ParallelChannel'}))
+            $core.meta.scrollLock = true
+            break
+        }
+    }
+    $events.emit('update-layout')
+}
+
+function mousemove(event) {
+    const layout = $core.layout
+    const [mx, my] = getMouse(event)
+    let t = $core.cursor.time
+    let v = layout.y2value(my)
+
+    // Hover feedback (cursor mode)
+    if ($core.meta.tool !== 'ParallelChannel' && !activePin && !dragWhole) {
+        for (const c of Object.values(channels)) {
+            if (c.data.locked || c.data.hidden) { c.hover = false; continue }
+            let q = c._coords
+            c.hover = q ? (pinHover(q.x1,q.y1,mx,my) || pinHover(q.x2,q.y2,mx,my) || pinHover(q.x3,q.y3,mx,my)
+                || segHit(mx,my,q.x1,q.y1,q.x2,q.y2) || segHit(mx,my,q.x1,q.y1b,q.x2,q.y2b)) : false
+        }
+    }
+
+    // Drawing stages
+    if (stage === 'base' && currentUuid) {
+        let d = channels[currentUuid].data
+        d.p2 = {t, v}; d.p3 = {t, v: v} // keep flat until offset stage
+        return
+    }
+    if (stage === 'offset' && currentUuid) {
+        channels[currentUuid].data.p3 = {t, v}
+        return
+    }
+
+    // Editing
+    if (activePin) {
+        let d = channels[activePin.uuid].data
+        if (activePin.idx === 1) d.p1 = {t, v}
+        else if (activePin.idx === 2) d.p2 = {t, v}
+        else d.p3 = {t, v}
+        return
+    }
+    if (dragWhole) {
+        let c = channels[dragWhole.uuid]; let d = c.data
+        let dvv = v - dragWhole.v
+        let ddt = layout.time2x(t) - layout.time2x(dragWhole.t)
+        let shift = (pt) => ({ t: layout.x2time(layout.time2x(pt.t) + ddt), v: pt.v + dvv })
+        d._base = d._base || {p1: {...d.p1}, p2: {...d.p2}, p3: {...d.p3}}
+        d.p1 = shift(d._base.p1); d.p2 = shift(d._base.p2); d.p3 = shift(d._base.p3)
+    }
+}
+
+function mouseup(event) {
+    if (activePin || dragWhole) {
+        for (const c of Object.values(channels)) delete c.data._base
+        commit()
+    }
+    activePin = null; dragWhole = null
+    $core.meta.scrollLock = false
+}
+
+function keydown(event) {
+    if (matchHotkey(event, 'deleteSelected')) {
+        let s = Object.values(channels).find(c => c.selected)
+        if (s) removeChannel(s.data.uuid)
+    }
+}
+
+function legend() { return void 0 }

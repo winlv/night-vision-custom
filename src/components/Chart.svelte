@@ -51,6 +51,10 @@ let storage = {} // Storage for helper variables
 let ctx = new Context(props) // For measuring text
 let chartRR = 0
 let layout = null
+// Raw pointer-button state (true while pressed), tracked independently of
+// `cursor.locked` because scrollLock suppresses that. Used to decide between
+// the light crosshair-only update and the full update (Phase 1.1).
+let pointerDown = false
 
 scan.calcIndexOffsets()
 
@@ -90,19 +94,31 @@ function onCursorChanged($cursor, emit = true) {
     if ($cursor.mode) cursor.mode = $cursor.mode
     if (cursor.mode !== 'explore') {
         cursor.xSync(hub, layout, chartProps, $cursor)
-        if ($cursor.visible === false) {
-            // One more update to hide the cursor
-            setTimeout(() => update())
-        }
     }
     if (emit) events.emit('$cursor-update',
         Utils.makeCursorEvent($cursor, cursor, layout)
     )
-    //if (cursor.locked) return // filter double updates (*)
-    update()
+    // Phase 1.1: plain hover repaints only the crosshair canvas. Drawing or
+    // dragging (pointer held, or a tool active) still needs the main canvas, so
+    // fall back to the full update. FAST_CURSOR=false forces the old behavior.
+    let fast = (chartProps.config.FAST_CURSOR ?? true)
+        && !pointerDown && !meta.drawingMode
+    if (fast) cursorUpdate()
+    else update()
+}
+
+// Light update: refresh legend/sidebar values + repaint only the crosshair
+// (overlay) canvas. Reuses the current `layout` — NO new Layout, NO candle
+// repaint. See docs/PHASE1_PLAN.md (1.1).
+function cursorUpdate() {
+    if (!layout) return
+    cursor = cursor // rebuild chartProps reactively → legend/sidebar refresh
+    events.emit('update-pane-cursor', layout)
+    events.emitSpec('botbar', 'update-bb', layout)
 }
 
 function onCursorLocked(state) {
+    pointerDown = state // raw button state (before the scrollLock filter below)
     if (cursor.scrollLock && state) return
     cursor.locked = state
 }

@@ -51,6 +51,9 @@
     });
     onDestroy(() => {
         events.off(`${bbUpdId}`);
+        // Hammer binds pointerdown on the canvas and pointermove/up/cancel
+        // on window — without this they leak on every mount/unmount cycle.
+        if (mc) mc.destroy();
     });
 
     async function listeners() {

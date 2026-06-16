@@ -19,7 +19,11 @@ export default class Crosshair extends Layer {
 
         this.id = id
         this.zIndex = 1000000
-        this.ctxType = 'Canvas';
+        // Phase 1.1: the crosshair lives on its OWN top canvas ('Overlay')
+        // so a mouse move repaints only it, not the candles/indicators below.
+        // It has the highest zIndex, so after sorting it is the last layer and
+        // mergeByCtx() naturally puts it in a separate, top-most renderer.
+        this.ctxType = 'Overlay';
         this.show = true;
         this.signalLevelActionHover = false;
         this.actionSize = 22;

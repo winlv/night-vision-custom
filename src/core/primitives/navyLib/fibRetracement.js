@@ -24,6 +24,7 @@ export default class FibRetracement {
     }
 
     draw(ctx) {
+        if (this.data && this.data.hidden) return
         const settings = {
             lineWidth: this.data.lineWidth,
             levels: this.data.levels,
@@ -54,6 +55,7 @@ export default class FibRetracement {
     }
 
     mousedown(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.propagate('mousedown', event)
         if (this.collision()) {
             if (this.core.meta.tool !== 'Cursor') {
@@ -78,6 +80,7 @@ export default class FibRetracement {
     }
 
     mousemove(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
             return void 0;
         }

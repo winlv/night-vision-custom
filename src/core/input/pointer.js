@@ -47,6 +47,7 @@ export default class Input {
     constructor() {
         this.rangeUpdateNeeded = false;
         this.rangeToUpdate = null;
+        this.destroyed = false;
         this.debouncedMousedrag = soon.bind(this, debounce(this.mousedrag.bind(this), 5));
     }
 
@@ -79,6 +80,10 @@ export default class Input {
         this.events.on("app:range-changed", e => this.range = e);
 
         await this.listeners();
+        // The chart may have been torn down while we awaited the dynamic
+        // Hammer/Hamster imports inside listeners(). If so, bail out so we
+        // don't bind mouse listeners to an orphaned canvas.
+        if (this.destroyed) return;
         this.mouseEvents("addEventListener");
     }
 
@@ -94,6 +99,11 @@ export default class Input {
     async listeners() {
         const Hamster = await import("hamsterjs");
         const Hammer = await import("hammerjs");
+
+        // Destroyed during the await above — don't create Hammer/Hamster
+        // managers that would bind (and leak) window/canvas listeners with
+        // no one left to destroy them.
+        if (this.destroyed) return;
 
         this.hm = Hamster.default(this.canvas);
         this.hm.wheel((event, delta) => this.mousezoom(-delta * 50, event));
@@ -487,12 +497,10 @@ export default class Input {
     }
 
     destroy() {
-        let rm = this.canvas.removeEventListener;
-        rm("gesturestart", this.gesturestart);
-        rm("gesturechange", this.gesturechange);
-        rm("gestureend", this.gestureend);
+        this.destroyed = true;
         if (this.mc) this.mc.destroy();
         if (this.hm) this.hm.unwheel();
         this.mouseEvents("removeEventListener");
+        if (this.events) this.events.off("app", "range-changed");
     }
 }

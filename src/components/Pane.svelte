@@ -35,6 +35,7 @@ $:style = `
 
 // EVENT INTEFACE
 events.on(`pane-${id}:update-pane`, update)
+events.on(`pane-${id}:update-pane-cursor`, updateCursor)
 
 onMount(() => {
     // console.log(`Pane ${id} mounted`)
@@ -56,6 +57,17 @@ function update($layout) {
     if (rsb) rsb.setLayers(layers)
     events.emitSpec(`sb-${id}-left`, 'update-sb', layout)
     events.emitSpec(`sb-${id}-right`, 'update-sb', layout)
+}
+
+// Phase 1.1: cursor-only update. Forward to the grid's overlay-only redraw and
+// refresh the sidebar cursor label, but DON'T reassign `layout` (that prop is
+// bound to Grid/Canvas; reassigning it would trigger a full static redraw).
+function updateCursor($layout) {
+    if (!$layout.grids) return
+    let gl = $layout.grids[id]
+    events.emitSpec(`grid-${id}`, 'update-grid-cursor', gl)
+    events.emitSpec(`sb-${id}-left`, 'update-sb', gl)
+    events.emitSpec(`sb-${id}-right`, 'update-sb', gl)
 }
 
 </script>

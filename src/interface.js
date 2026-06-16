@@ -46,9 +46,8 @@ class NightVision {
             props: props
         })
 
-        // TODO: remove the observer on chart destroy
         if (props.autoResize) {
-            resizeTracker(this)
+            this._resizeOff = resizeTracker(this)
         }
 
         this.se.setRefs(this.hub, this.scan)
@@ -102,7 +101,7 @@ class NightVision {
     }
 
     set showLogo(val) {
-        this.comp.$set({id: val})
+        this.comp.$set({showLogo: val})
     }
 
 
@@ -255,10 +254,18 @@ class NightVision {
 
     // Should call this to clean-up memory / events
     destroy() {
-        console.log('chart destroy');
-        this.comp.$destroy();
-        this.ww.stop();
-        // this.root = undefined;
+        // Stop the resize observer first so it can't poke a dead comp.
+        if (this._resizeOff) {
+            this._resizeOff()
+            this._resizeOff = null
+        }
+        if (this.comp) this.comp.$destroy();
+        // Null the comp so the `this.comp?.getChart()` guards in the
+        // getters actually short-circuit (a destroyed Svelte instance is
+        // still truthy but no longer exposes its exported methods).
+        this.comp = null;
+        if (this.ww) this.ww.stop();
+        this.root = null;
     }
 }
 

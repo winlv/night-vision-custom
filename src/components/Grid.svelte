@@ -41,6 +41,7 @@ let keyboard = null
 
 // EVENT INTEFACE
 events.on(`grid-${id}:update-grid`, update)
+events.on(`grid-${id}:update-grid-cursor`, updateCursor)
 events.on(`grid-${id}:remake-grid`, make)
 events.on(`grid-${id}:propagate`, propagate)
 events.on(`grid-${id}:run-grid-task`, onTask)
@@ -117,7 +118,6 @@ function makeLayers() {
 
         let l = new Layer(i, ov.name, props.id)
         let z = ov.settings.zIndex
-        l.zIndex = z ?? (ov.main ? 0 : -1)
 
         // Create overlay environment
         let env = new OverlayEnv(i, ov, layout, props)
@@ -125,7 +125,20 @@ function makeLayers() {
         l.overlay = prefab.make(env)
         l.env = env
         l.ovSrc = ov
-        l.ctxType = prefab.ctx
+
+        // Phase 1.1: drawing tools render on the dynamic 'Overlay' canvas
+        // (same as the crosshair) so they track/hover/drag on mouse-move
+        // WITHOUT repainting the candles below. We lift their zIndex into a
+        // band above the static layers (grid/candles/trackers) but below the
+        // crosshair (1e6), preserving their relative order, so mergeByCtx()
+        // groups them together with the crosshair into one top renderer.
+        if (ov.drawingTool) {
+            l.ctxType = 'Overlay'
+            l.zIndex = 600000 + (z ?? 0)
+        } else {
+            l.ctxType = prefab.ctx
+            l.zIndex = z ?? (ov.main ? 0 : -1)
+        }
         env.overlay = l.overlay // make a reference
         meta.exctractFrom(l.overlay)
         layers.push(l)
@@ -199,6 +212,20 @@ function update($layout = layout) {
     }
 }
 
+// Phase 1.1: cursor-only redraw — repaint ONLY the 'Overlay' (crosshair)
+// renderer(s). We must NOT touch the `layout` prop bound to <Canvas> (a
+// reassignment would invalidate Canvas's reactive width/height and trigger a
+// full resizeWatch redraw of the static canvas). The crosshair reads the live
+// cursor via props, so no env update is needed here either.
+function updateCursor($layout = layout) {
+    if (input) input.layout = $layout
+    for (var rr of renderers) {
+        if (rr.ctxType === 'Overlay') {
+            events.emitSpec(`rr-${id}-${rr.id}`, 'update-rr', $layout)
+        }
+    }
+}
+
 function propagate(e) {
     let { name, event } = e
     for (var layer of layers) {
@@ -224,7 +251,7 @@ function onTask(event) {
 </style>
 <div class="nvjs-grid" {style}>
     {#each renderers as rr, i}
-        {#if rr.ctxType === 'Canvas'}
+        {#if rr.ctxType === 'Canvas' || rr.ctxType === 'Overlay'}
             <Canvas {id} bind:this={rr.ref}
                 layout={layout}
                 props={props} rr={rr}/>

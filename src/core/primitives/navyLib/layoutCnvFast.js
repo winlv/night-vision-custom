@@ -9,11 +9,14 @@ const HPX = Const.HPX
 // Calulate positions & sizes for candles (if $c),
 // volume bars (if $v), or both by default
 export default function layoutCnv(
-    core, $c = true, $v = true, vIndex = 5, dirIndex, vScale) {
+    core, $c = true, $v = true, vIndex = 5, dirIndex, vScale, dataOverride) {
 
     let config = core.props.config
     let interval = core.props.interval
-    let data = core.data
+    // `dataOverride` lets a candle-style overlay (e.g. Heikin Ashi) render a
+    // transformed series with the SAME indices/timestamps as core.data, while
+    // the view range still indexes into it correctly. Defaults to core.data.
+    let data = dataOverride || core.data
     let ti2x = core.layout.ti2x
     let layout = core.layout
     let view = core.view

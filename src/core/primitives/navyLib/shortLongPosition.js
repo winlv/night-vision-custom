@@ -23,6 +23,7 @@ export default class ShortLongPosition {
     }
 
     draw(ctx) {
+        if (this.data && this.data.hidden) return
         this.shortLongPosition.update(this.data, this.selected);
         this.shortLongPosition.draw(ctx);
 
@@ -34,6 +35,7 @@ export default class ShortLongPosition {
     }
 
     mousedown(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.propagate('mousedown', event)
         if (this.collision()) {
             if (this.core.meta.tool !== 'Cursor') {
@@ -58,6 +60,7 @@ export default class ShortLongPosition {
     }
 
     mousemove(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
             return void 0;
         }

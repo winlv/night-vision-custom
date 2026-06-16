@@ -37,6 +37,7 @@ export default class TrendLine {
     }
 
     draw(ctx) {
+        if (this.data && this.data.hidden) return
         const layout = this.core.layout;
         const color = this.data.color ?? '#dc9800';
 
@@ -140,6 +141,7 @@ export default class TrendLine {
     }
 
     mousedown(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.propagate('mousedown', event);
         const pinActive = this.pins.some(p => p.state === 'dragging' || p.state === 'tracking');
 
@@ -163,6 +165,7 @@ export default class TrendLine {
     }
 
     mousemove(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.pressedShift = event.shiftKey;
 
         if (this.isDragging) {

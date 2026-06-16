@@ -24,6 +24,7 @@ export default class Rectangle {
     }
 
     draw(ctx) {
+        if (this.data && this.data.hidden) return
         const strokeStyle = this.data.color ?? '#dc9800';
 
         this.rectangle.update(this.data.p1, this.data.p2)
@@ -94,6 +95,7 @@ export default class Rectangle {
     }
 
     mousedown(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.propagate('mousedown', event)
 
         if (this.collision()) {
@@ -115,6 +117,7 @@ export default class Rectangle {
     }
 
     mousemove(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
             return void 0;
         }

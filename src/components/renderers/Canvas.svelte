@@ -10,6 +10,7 @@ import { onMount, onDestroy } from 'svelte'
 import Events from '../../core/events.js'
 import dpr from '../../stuff/dprCanvas.js'
 import math from "../../stuff/math.js";
+import perf from "../../stuff/perf.js";
 
 export let id // Pane/grid id
 export let props = {} // General props
@@ -38,7 +39,7 @@ $:rrStyle = `
 $:canvasStyle = `
     position: relative;
     z-index:1;
-    background: ${layout.main ? 'transparent' :  props.colors.back};
+    background: ${(layout.main || rr.ctxType === 'Overlay') ? 'transparent' :  props.colors.back};
 `;
 $:width = layout.width
 $:height = layout.height
@@ -48,9 +49,16 @@ let canvas // Canvas ref
 let ctx // Canvas context
 let input // Input attacher to the renderer
 
+// Phase 1.2: rAF batching. Multiple `update-rr` events within one frame are
+// coalesced into a single paint via a dirty flag + one requestAnimationFrame.
+let dirty = false
+let pendingLayout = layout
+let rafId = null
+
 onMount(() => { setup() })
 onDestroy(() => {
     events.off(`${rrUpdId}`)
+    if (rafId !== null) cancelAnimationFrame(rafId)
     if (input) input.destroy()
 })
 
@@ -84,11 +92,30 @@ function setup() {
 
 }
 
+// Schedule a paint (coalesced to one per frame). Use draw() directly only
+// when a synchronous repaint is required (e.g. right after a resize).
 function update($layout = layout) {
+    pendingLayout = $layout
+    dirty = true
+    if (rafId === null) rafId = requestAnimationFrame(flush)
+}
+
+function flush() {
+    rafId = null
+    if (!dirty) return
+    dirty = false
+    draw(pendingLayout)
+}
+
+function draw($layout = layout) {
 
     layout = $layout
 
     if (!ctx || !layout) return
+
+    // Perf counter: lets the dev HUD / tests see how often THIS renderer
+    // repaints (e.g. confirm a mouse move no longer redraws the main canvas).
+    perf.countDraw(rr.ctxType)
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     //if (this.$p.shaders.length) this.apply_shaders()
@@ -110,7 +137,8 @@ function update($layout = layout) {
 
     // TODO: css thing didn't work, coz canvas draws
     // through the border somehow. See Pane.svelte
-    if (id > 0) upperBorder()
+    // (the pane separator belongs to the static canvas, not the crosshair one)
+    if (id > 0 && rr.ctxType !== 'Overlay') upperBorder()
 
 }
 
@@ -132,7 +160,7 @@ function upperBorder() {
 function resizeWatch() {
     if (!canvas) return
     dpr.resize(canvas, ctx, layout.width, layout.height)
-    update()
+    draw() // sync — avoid a blank frame after the canvas is resized/cleared
 }
 
 </script>

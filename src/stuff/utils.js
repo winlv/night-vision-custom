@@ -114,6 +114,52 @@ export default {
         return panes.map(x => x.overlays || []).flat()
     },
 
+    // --- Price-based chart-type series builders (Phase 3.3) ---
+    // Both consume OHLCV [t,o,h,l,c,v,...] and return brick/bar OHLCV rows with
+    // high/low == body extents (no wicks). Meant to be rendered as Candles in
+    // index-based mode (bricks are evenly spaced, time is non-uniform).
+
+    // Renko: a new brick each time price moves >= `brick` from the last level
+    // (snapped to a fixed price grid).
+    renko(data, brick) {
+        if (!data || data.length < 2 || !brick || brick <= 0) return data || []
+        let out = []
+        let level = data[0][4]
+        let v = 0
+        for (var i = 0; i < data.length; i++) {
+            let c = data[i][4], t = data[i][0]
+            v += data[i][5] || 0
+            while (c - level >= brick) {           // up brick(s)
+                let o = level, cl = level + brick
+                out.push([t, o, cl, o, cl, v]); level = cl; v = 0
+            }
+            while (level - c >= brick) {            // down brick(s)
+                let o = level, cl = level - brick
+                out.push([t, o, o, cl, cl, v]); level = cl; v = 0
+            }
+        }
+        return out
+    },
+
+    // Range bars: a new bar each time price moves `range` from the bar's open
+    // (bars float from the previous close rather than snapping to a grid).
+    rangeBars(data, range) {
+        if (!data || data.length < 2 || !range || range <= 0) return data || []
+        let out = []
+        let o = data[0][4]
+        let v = 0
+        for (var i = 0; i < data.length; i++) {
+            let c = data[i][4], t = data[i][0]
+            v += data[i][5] || 0
+            while (Math.abs(c - o) >= range) {
+                let cl = o + (c > o ? range : -range)
+                out.push([t, o, Math.max(o, cl), Math.min(o, cl), cl, v])
+                o = cl; v = 0
+            }
+        }
+        return out
+    },
+
     // Detects a timeframe of the data
     detectTimeframe(data) {
         let len = Math.min(data.length - 1, 99)

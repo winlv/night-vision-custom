@@ -698,7 +698,7 @@ export default class ScriptStd {
      * @return {number}
      */
     floor(x) {
-        Math.floor(x)
+        return Math.floor(x)
     }
 
     /** Highest value for a given number of candles back
@@ -1100,11 +1100,12 @@ export default class ScriptStd {
     }
 
     /** Shortcut for Math.pow()
-     * @param {number} x The variable
+     * @param {number} x The base
+     * @param {number} y The exponent
      * @return {number}
      */
-    pow(x) {
-        return Math.pow(x)
+    pow(x, y) {
+        return Math.pow(x, y)
     }
 
     /** Test if "src" TS is rising for "len" candles

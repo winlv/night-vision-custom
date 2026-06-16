@@ -97,8 +97,8 @@ export default class Cursor {
                 const high = ohlc[2];
                 const low = ohlc[3];
 
-                const distLow = (Math.abs($ - low) / low) * 100;
-                const distHigh = (Math.abs($ - high) / high) * 100;
+                const distLow = low ? (Math.abs($ - low) / low) * 100 : Infinity;
+                const distHigh = high ? (Math.abs($ - high) / high) * 100 : Infinity;
 
                 const threshold = 10.0;
 
@@ -142,14 +142,17 @@ export default class Cursor {
     }
 
     // Copy of the same function from layoutFn.js
+    // (must stay in sync with layoutFn's y2value/value2y so the
+    //  crosshair/magnet snap matches the rendered scale)
     y2value(y, scale) {
-        let ls = scale.scaleSpecs.log
-        ls = false;
+        let ls = (scale.scaleSpecs || {}).log
         if (ls) return math.exp((y - scale.B) / scale.A)
         return (y - scale.B) / scale.A
     }
 
     value2y(y, scale) {
+        let ls = (scale.scaleSpecs || {}).log
+        if (ls) y = math.log(y)
         return y * scale.A + scale.B + HPX
     }
 

@@ -1,0 +1,147 @@
+
+// NavyJS ~ 0.2-lite
+
+// <ds>Heikin Ashi candles</ds> — derived from standard OHLCV:
+// [<timestamp>, <open>, <high>, <low>, <close>, <?volume>]
+// HAclose = (o+h+l+c)/4
+// HAopen  = (prevHAopen + prevHAclose) / 2   (seed: (o+c)/2)
+// HAhigh  = max(high, HAopen, HAclose)
+// HAlow   = min(low,  HAopen, HAclose)
+
+[OVERLAY name=HeikinAshi, ctx=Canvas, version=1.0.0]
+
+prop('colorBodyUp', { type: 'color', def: $core.colors.candleUp })
+prop('colorBodyDw', { type: 'color', def: $core.colors.candleDw })
+prop('colorWickUp', { type: 'color', def: $core.colors.wickUp })
+prop('colorWickDw', { type: 'color', def: $core.colors.wickDw })
+prop('colorVolUp', { type: 'color', def: $core.colors.volUp })
+prop('colorVolDw', { type: 'color', def: $core.colors.volDw })
+prop('showVolume', { type: 'boolean', def: true })
+prop('currencySymbol', { type: 'string', def: '$' })
+prop('priceLine', { type: 'boolean', def: true })
+prop('showValueTracker', { type: 'boolean', def: true })
+
+// Cached HA series (recomputed only when the source data changes — pan/zoom
+// reuse it). Keyed by length + last timestamp + last close.
+let haData = null
+let haLen = -1
+let haLastT = null
+let haLastC = null
+
+function computeHA(src) {
+    let n = src.length
+    let out = new Array(n)
+    let prevO, prevC
+    for (var i = 0; i < n; i++) {
+        let p = src[i]
+        let o = p[1], h = p[2], l = p[3], c = p[4]
+        let hc = (o + h + l + c) / 4
+        let ho = (i === 0) ? (o + c) / 2 : (prevO + prevC) / 2
+        let hh = Math.max(h, ho, hc)
+        let hl = Math.min(l, ho, hc)
+        let row = [p[0], ho, hh, hl, hc, p[5]]
+        for (var k = 6; k < p.length; k++) row.push(p[k])
+        out[i] = row
+        prevO = ho
+        prevC = hc
+    }
+    return out
+}
+
+function getHA() {
+    let src = $core.data
+    let n = src.length
+    if (!n) return []
+    let last = src[n - 1]
+    if (!haData || haLen !== n || haLastT !== last[0] || haLastC !== last[4]) {
+        haData = computeHA(src)
+        haLen = n
+        haLastT = last[0]
+        haLastC = last[4]
+    }
+    return haData
+}
+
+draw(ctx) {
+
+    let ha = getHA()
+    // Render the HA series through the standard candle layout (data override).
+    let cnv = $lib.layoutCnv($core, true, $props.showVolume, 5, undefined, undefined, ha)
+    let bodies = cnv.upBodies.length ? cnv.upBodies : cnv.dwBodies
+    if (!bodies.length) return
+    let w = Math.max(bodies[0].w, 1)
+
+    drawCvPart(ctx, $lib.candleWick, cnv.dwWicks, 1, 'colorWickDw')
+    drawCvPart(ctx, $lib.candleWick, cnv.upWicks, 1, 'colorWickUp')
+    drawCvPart(ctx, $lib.candleBody, cnv.dwBodies, w, 'colorBodyDw')
+    drawCvPart(ctx, $lib.candleBody, cnv.upBodies, w, 'colorBodyUp')
+    drawCvPart(ctx, $lib.candleBodyTransparent, cnv.dwBodies, w, 'colorBodyDw')
+    drawCvPart(ctx, $lib.candleBodyTransparent, cnv.upBodies, w, 'colorBodyUp')
+    drawCvPart(ctx, $lib.volumeBar, cnv.dwVolbars, w, 'colorVolDw')
+    drawCvPart(ctx, $lib.volumeBar, cnv.upVolbars, w, 'colorVolUp')
+
+}
+
+drawCvPart(ctx, f, arr, w, color) {
+    let layout = $core.layout
+    ctx.lineWidth = w
+    ctx.strokeStyle = $props[color]
+    ctx.beginPath()
+    for (var i = 0, n = arr.length; i < n; i++) {
+        f(ctx, arr[i], layout, w)
+    }
+    ctx.stroke()
+}
+
+// y-range from raw high/low (HA high/low stay ~within the raw range).
+static yRange(data) {
+    let len = data.length
+    var high = -Infinity, low = Infinity
+    for(var i = 0; i < len; i++) {
+        let point = data[i]
+        if (point[2] > high) high = point[2]
+        if (point[3] < low) low = point[3]
+    }
+    return [high, low]
+}
+
+static preSampler(x) => [x[1], x[4]]
+
+ohlc(x) => [x[1], x[2], x[3], x[4]]
+
+valueTracker(x) => {
+    show: $props.showValueTracker,
+    symbol: false,
+    line: $props.priceLine,
+    color: $lib.candleColor($props, $core.data[$core.data.length - 1]),
+    value: x[4] // actual close (price line tracks real price)
+}
+
+// Legend shows the HA OHLC at the cursor.
+legendHtml(x, prec, f) {
+    let color1 = $core.colors.text
+    let ha = getHA()
+    let i = $core.cursor.getValue ? null : null
+    // Find the HA row matching the cursor time (fallback: last)
+    let t = $core.cursor.time
+    let row = null
+    for (var k = ha.length - 1; k >= 0; k--) {
+        if (ha[k][0] === t) { row = ha[k]; break }
+    }
+    if (!row) row = ha.length ? ha[ha.length - 1] : x
+    let color2 = row[4] >= row[1] ? $props.colorBodyUp : $props.colorBodyDw
+
+    return `
+    <span style="color: ${color2}">
+        <span style="margin-left: 3px;"></span>
+        <span style="color: ${color1}">HA</span>
+        <span style="color: ${color1}">O</span>
+        <span class="nvjs-ll-value">${f(row[1])}</span>
+        <span style="color: ${color1}">H</span>
+        <span class="nvjs-ll-value">${f(row[2])}</span>
+        <span style="color: ${color1}">L</span>
+        <span class="nvjs-ll-value">${f(row[3])}</span>
+        <span style="color: ${color1}">C</span>
+        <span class="nvjs-ll-value">${f(row[4])}</span>
+    </span>`
+}
