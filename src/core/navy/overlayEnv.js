@@ -9,6 +9,7 @@ import Scan from '../dataScanner.js'
 import Utils from '../../stuff/utils.js'
 import Mouse from '../input/mouse.js'
 import Keys from '../input/keys.js'
+import {matchHotkeyAction} from '../input/hotkeys.js'
 
 // Build-in primitives
 import Candle from '../primitives/navyLib/candle.js'
@@ -80,6 +81,14 @@ export default class OverlayEnv {
         }
 
         this.$core.lib = this.lib
+    }
+
+    // Match a keyboard event against a named action, using the host's custom
+    // key map (props.config.hotkeys) with a built-in default fallback.
+    matchHotkey(event, action) {
+        let map = this.$core && this.$core.props
+            && this.$core.props.config && this.$core.props.config.hotkeys
+        return matchHotkeyAction(event, action, map)
     }
 
     // Defines new property

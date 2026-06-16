@@ -195,7 +195,7 @@ mousemove(event)
 
 keydown(event)
 {
-    if (event.code === 'Backspace' || event.code === 'Delete') {
+    if (matchHotkey(event, 'deleteSelected')) {
         let s = Object.values(lines).find(x => x.selected)
         if (s) removeLine(s.data.uuid)
     }

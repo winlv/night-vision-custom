@@ -33,7 +33,7 @@ function draw(ctx) {
 
 let pressedAlt = false;
 function keydown(event) {
-    if (event.code === 'Backspace' || event.code === 'Delete') {
+    if (matchHotkey(event, 'deleteSelected')) {
         let s = Object.values(circles).find(x => x.selected)
         if (s) removeCircle(s.data.uuid)
     }

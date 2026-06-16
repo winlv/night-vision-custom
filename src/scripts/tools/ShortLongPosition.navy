@@ -70,7 +70,7 @@ function mousemove(event) {
 }
 
 function keydown(event) {
-    if (event.code === 'Backspace' || event.code === 'Delete') {
+    if (matchHotkey(event, 'deleteSelected')) {
         let s = Object.values(rectangles).find(x => x.selected)
         if (s) removeTool(s.data.uuid)
     }

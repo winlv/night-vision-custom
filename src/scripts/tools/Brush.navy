@@ -30,19 +30,19 @@ function draw(ctx) {
 
 let pressedAlt = false;
 function keydown(event) {
-    if (pressedAlt && event.code === 'KeyB') {
+    if (matchHotkey(event, 'brush')) {
         mouseX = $core.mouse.x;
         brushSelected(null);
         $events.emit('update-layout');
         return void 0;
     }
 
-    if (event.code === 'Backspace' || event.code === 'Delete') {
+    if (matchHotkey(event, 'deleteSelected')) {
         let s = Object.values(brushes).find(x => x.selected)
         if (s) removeBrush(s.data.uuid);
     }
 
-    if (event.code === 'Escape') {
+    if (matchHotkey(event, 'cancelDrawing')) {
         brushSelected(null);
         $events.emit('drawing-mode-off');
     }

@@ -86,11 +86,11 @@ function mousemove(event) {
 
 let pressedAlt = false;
 function keydown(event) {
-    if (event.code === 'Backspace' || event.code === 'Delete') {
+    if (matchHotkey(event, 'deleteSelected')) {
         let s = Object.values(lines).find(x => x.selected)
         if (s) removeTool(s.data.uuid)
     }
-    if (pressedAlt && event.code === 'KeyF') {
+    if (matchHotkey(event, 'fib')) {
         timeId = setTimeout(newTool, 0)
 
         mouseX = $core.mouse.x;

@@ -186,7 +186,7 @@ function mouseup(event) {
 
 function keydown(event) {
     if (isEditingNow) return;
-    if ((event.code === 'Backspace' || event.code === 'Delete') && activeUuid) {
+    if (matchHotkey(event, 'deleteSelected') && activeUuid) {
         removeTool(activeUuid);
     }
 }

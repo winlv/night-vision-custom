@@ -204,6 +204,11 @@ export default class ParserOV {
             // Add primitives
             let $lib = env.lib
 
+            // Configurable hotkeys: matchHotkey(event, 'brush') — reads the
+            // host's custom key map (props.config.hotkeys) with a built-in
+            // default fallback, so tools never hardcode key combos.
+            let matchHotkey = (event, action) => env.matchHotkey(event, action)
+
             // Function stubs
             var init = () => {}
             var destroy = () => {}

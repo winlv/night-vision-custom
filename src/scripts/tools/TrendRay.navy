@@ -188,12 +188,12 @@ mousemove(event)
 
 let pressedAlt = false;
 function keydown(event) {
-    if (event.code === 'Backspace' || event.code === 'Delete') {
+    if (matchHotkey(event, 'deleteSelected')) {
         let s = Object.values(lines).find(x => x.selected)
         if (s) removeLine(s.data.uuid)
     }
 
-    if (pressedAlt && event.code === 'KeyG') {
+    if (matchHotkey(event, 'trendRay')) {
         timeId = setTimeout(newLine, 0)
 
         mouseX = $core.mouse.x;

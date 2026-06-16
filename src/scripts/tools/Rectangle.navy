@@ -35,12 +35,12 @@ function draw(ctx) {
 
 let pressedAlt = false;
 function keydown(event) {
-    if (event.code === 'Backspace' || event.code === 'Delete') {
+    if (matchHotkey(event, 'deleteSelected')) {
         let s = Object.values(rectangles).find(x => x.selected)
         if (s) removeRectangle(s.data.uuid)
     }
 
-    if (pressedAlt && event.code === 'KeyR') {
+    if (matchHotkey(event, 'rectangle')) {
         timeId = setTimeout(newRectangle, 0)
 
         mouseX = $core.mouse.x;
