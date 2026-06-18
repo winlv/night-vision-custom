@@ -1,32 +1,10 @@
-import * as PIXI from 'pixi.js';
-import Events from "../events.js";
-import MetaHub from "../metaHub.js";
+// Orderbook depth heatmap — a GpuOverlay specialization.
+//
+// All the Pixi/WebGL instanced-quad plumbing now lives in GpuOverlay; this
+// file only does the orderbook-specific work: per-exchange color palettes and
+// turning [timestamp, {a, b}] depth snapshots into colored cells.
 
-const VERTEX_SHADER = `
-    attribute vec2 aVertexPosition; 
-    attribute vec2 aInstancePos;  
-    attribute vec2 aInstanceSize; 
-    attribute vec4 aInstanceColor;
-
-    uniform mat3 translationMatrix;
-    uniform mat3 projectionMatrix;
-
-    varying vec4 vColor;
-
-    void main() {
-        vColor = aInstanceColor;
-        vec3 finalPos = translationMatrix * vec3(aVertexPosition * aInstanceSize + aInstancePos, 1.0);
-        gl_Position = vec4((projectionMatrix * finalPos).xy, 0.0, 1.0);
-    }
-`;
-
-const FRAGMENT_SHADER = `
-    precision mediump float;
-    varying vec4 vColor;
-    void main() {
-        gl_FragColor = vec4(vColor.rgb * vColor.a, vColor.a);
-    }
-`;
+import GpuOverlay from './gpuOverlay.js';
 
 const EXCHANGES_CONFIG = {
     'bi-s': 'BINANCE_SPOT',
@@ -49,75 +27,23 @@ const EXCHANGES_CONFIG = {
     'kuc-f': 'KUCOIN_FUTURES'
 };
 
-export default class Heatmap {
-    heatmapApp = undefined;
-    instancedMesh = undefined;
-    instanceBuffer = undefined;
+export default class Heatmap extends GpuOverlay {
 
-    MAX_INSTANCES = 300000;
-    STRIDE = 8;
+    // Backward-compat aliases: navy scripts (heatmap.navy, ht.navy) reach into
+    // `meta.heatmap.heatmapApp.stage` and code referenced `.instancedMesh`.
+    get heatmapApp() { return this.app; }
+    get instancedMesh() { return this.mesh; }
 
     constructor(id) {
-        this.nvId = id;
-        this.events = Events.instance(this.nvId);
-        this.meta = MetaHub.instance(this.nvId);
-
-        this.events.on(`heatmap-layer:layout-update`, this.layoutUpdate.bind(this));
-
-        this.heatmapApp = new PIXI.Application({
-            backgroundAlpha: 0,
-            antialias: true,
-            autoDensity: true,
-            resizeTo: window,
-            resolution: window.devicePixelRatio || 1,
-        });
-
-        this.heatmapApp.view.style.position = 'absolute';
-        this.heatmapApp.view.style.top = '0';
-        this.heatmapApp.view.style.left = '0';
-        this.heatmapApp.view.style.pointerEvents = 'none';
-        this.heatmapApp.view.classList.add('orderbook-heatmap');
+        super(id, { maxInstances: 300000, className: 'orderbook-heatmap' });
 
         this.PALETTE_SIZE = 256;
-        this.askPalette = new Float32Array(this.PALETTE_SIZE * 4);
-        this.bidPalette = new Float32Array(this.PALETTE_SIZE * 4);
-        this.palettes = {
-            asks: new Map(),
-            bids: new Map()
-        };
+        this.palettes = { asks: {}, bids: {} };
         this.maxVolumes = new Map();
         this.lastScales = { asks: '', bids: '' };
 
-        window.PIXI = PIXI;
-
-        this.initInstancedMesh();
-
-        // hz
-        this.meta.hub.se.chart.root.appendChild(this.heatmapApp.view);
+        this.events.on(`heatmap-layer:layout-update`, this.layoutUpdate.bind(this));
         this.meta.heatmap = this;
-    }
-
-    initInstancedMesh() {
-        const geometry = new PIXI.Geometry()
-            .addAttribute('aVertexPosition', [0,0, 1,0, 1,1, 0,1], 2)
-            .addIndex([0, 1, 2, 0, 2, 3]);
-
-        this.instanceBuffer = new Float32Array(this.MAX_INSTANCES * this.STRIDE);
-
-        this.gpuBuffer = new PIXI.Buffer(this.instanceBuffer, false, false);
-
-        geometry.addAttribute('aInstancePos', this.gpuBuffer, 2, false, PIXI.TYPES.FLOAT, 32, 0, true);
-        geometry.addAttribute('aInstanceSize', this.gpuBuffer, 2, false, PIXI.TYPES.FLOAT, 32, 8, true);
-        geometry.addAttribute('aInstanceColor', this.gpuBuffer, 4, false, PIXI.TYPES.FLOAT, 32, 16, true);
-
-        const shader = PIXI.Shader.from(VERTEX_SHADER, FRAGMENT_SHADER);
-        this.instancedMesh = new PIXI.Mesh(geometry, shader, null, PIXI.DRAW_MODES.TRIANGLES);
-
-        this.instancedMesh.state.blendMode = PIXI.BLEND_MODES.NORMAL;
-        // hz
-        this.instancedMesh.geometry.instanceCount = 0;
-
-        this.heatmapApp.stage.addChild(this.instancedMesh);
     }
 
     updatePalettes(colorScaleAsks, colorScaleBids, maxVolumesMap) {
@@ -125,8 +51,6 @@ export default class Heatmap {
         if (this.lastScales.asks === cacheKey) return;
 
         this.palettes = { asks: {}, bids: {} };
-
-        console.log(maxVolumesMap);
 
         for (const [exName, maxVol] of Object.entries(maxVolumesMap)) {
             const askPal = new Float32Array(this.PALETTE_SIZE * 4);
@@ -154,7 +78,7 @@ export default class Heatmap {
     }
 
     updateData(data, layout, props, colorScaleAsks, colorScaleBids, aggStep, exchange, maxVolumesMap, fullRedraw = false) {
-        if (!this.instancedMesh || !data?.length) return;
+        if (!this.mesh || !data?.length) return;
 
         this.updatePalettes(colorScaleAsks, colorScaleBids, maxVolumesMap);
 
@@ -172,7 +96,6 @@ export default class Heatmap {
             const x = layout.ti2xWithoutRound(timestamp) - cellWidth / 2;
             if (x + cellWidth < 0 || x > layout.width) continue;
 
-            const minVisiblePrice = layout.y2value(layout.height);
             const maxVisiblePrice = layout.y2value(0);
 
             const renderSide = (orders, type) => {
@@ -187,7 +110,7 @@ export default class Heatmap {
                 const v2y = layout.value2y;
 
                 const buffer = this.instanceBuffer;
-                const maxIdx = this.MAX_INSTANCES * 8;
+                const maxIdx = this.MAX_INSTANCES * this.STRIDE;
 
                 for (let j = 0; j < len && idx < maxIdx; j += 3) {
                     const price = orders[j];
@@ -198,7 +121,6 @@ export default class Heatmap {
                     const exId = orders[j + 2];
                     const palette = paletteMap[exId];
                     if (!palette) continue;
-
 
                     const maxVol = maxVolumesMap[EXCHANGES_CONFIG[exId]] || 100000;
                     const intensity = (price * qty) / maxVol;
@@ -219,7 +141,7 @@ export default class Heatmap {
                     buffer[idx + 6] = palette[pOff + 2];
                     buffer[idx + 7] = palette[pOff + 3];
 
-                    idx += 8;
+                    idx += this.STRIDE;
                 }
             };
 
@@ -227,33 +149,16 @@ export default class Heatmap {
             if (levels.b) renderSide(levels.b, 'bids');
         }
 
-        this.instancedMesh.geometry.instanceCount = idx / 8;
-        this.gpuBuffer.update(this.instanceBuffer);
+        this.commit(idx / this.STRIDE);
     }
 
-    // hz
     layoutUpdate({layout, props}) {
-        if (!layout.main || !this.heatmapApp) return;
-        this.heatmapApp.stage.position.set(0, 0);
-        this.heatmapApp.stage.scale.set(1, 1);
+        if (!layout.main || !this.app) return;
+        this.resetTransform();
     }
 
-    // get rid of this shit
-    parseColor(colorStr) {
-        if (colorStr[0] === '#') {
-            const hex = parseInt(colorStr.substring(1), 16);
-            return { r: ((hex >> 16) & 255) / 255, g: ((hex >> 8) & 255) / 255, b: (hex & 255) / 255, a: 1 };
-        }
-        const m = colorStr.match(/[\d\.]+/g);
-        if (m) return { r: m[0]/255, g: m[1]/255, b: m[2]/255, a: parseFloat(m[3] || 1) };
-        return { r: 1, g: 1, b: 1, a: 1 };
-    }
-
-    // hz
     destroy() {
         this.events.off('heatmap-layer');
-        if (this.heatmapApp) {
-            this.heatmapApp.destroy(true, { children: true, texture: true, baseTexture: true });
-        }
+        super.destroy();
     }
 }

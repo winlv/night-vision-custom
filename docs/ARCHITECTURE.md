@@ -8,7 +8,9 @@
 
 Despite the README/CLAUDE.md calling this a "GPU-accelerated Pixi.js" library,
 **the main chart is rendered with plain Canvas 2D** in immediate mode. Pixi.js /
-WebGL is used **only** for the orderbook heatmap (`src/core/primitives/heatmap.js`).
+WebGL is used **only** for instanced-quad overlays drawn on a transparent canvas
+*above* the Canvas-2D chart — currently the orderbook heatmap. These now share a
+reusable base, `GpuOverlay` (see "GPU overlay base" below).
 
 - Renderer: `src/components/renderers/Canvas.svelte` — `getContext('2d')`,
   `ctx.clearRect(...)` + full redraw of every layer on each update
@@ -127,6 +129,40 @@ that involves the main pane (so sub-panes can never be placed above it — doing
 glitched the layout), and `Legend.svelte` disables the arrows accordingly (both on
 the main pane, and "up" on the pane directly below it). Enforced centrally in
 DataHub, so any UI that emits `hub:move-pane` is covered.
+
+## GPU overlay base (`GpuOverlay`)
+
+`src/core/primitives/gpuOverlay.js` is the reusable WebGL instanced-quad base,
+extracted from the orderbook heatmap. It owns all the Pixi plumbing so a new
+GPU overlay only has to turn its data into colored rectangles:
+
+- a transparent `PIXI.Application` (`resizeTo: window`, `pointerEvents: none`)
+  laid over the Canvas-2D chart and appended to `chart.root`;
+- one instanced unit-quad `PIXI.Mesh` + a `Float32Array` instance buffer, with a
+  fixed per-instance layout of **STRIDE = 8 floats**: `[x, y, w, h, r, g, b, a]`
+  (position, size, straight-alpha color 0..1). Same generic colored-quad shader
+  for every overlay.
+
+API for subclasses:
+- write quads incrementally — `beginFrame()` → `addQuad(x,y,w,h,r,g,b,a)` (returns
+  `false` when the buffer is full) → `endFrame()`; **or** for hot paths fill
+  `this.instanceBuffer` directly and call `commit(instanceCount)` (what the
+  heatmap does);
+- `parseColor("#rgb" | "rgb()/rgba()")` → `{r,g,b,a}` in 0..1;
+- `resetTransform()` resets the stage to screen space; `clear()`; `destroy()`.
+
+`Heatmap` (`heatmap.js`) now `extends GpuOverlay` and only implements the
+orderbook specifics (per-exchange palettes + depth-snapshot → cells in
+`updateData`). **Backward-compat:** navy scripts (`heatmap.navy`, `ht.navy`) and
+`Grid.svelte` reach into `meta.heatmap.heatmapApp.stage` / `.instancedMesh`, so
+`Heatmap` keeps those as getters aliasing the base's `app` / `mesh`. The
+`heatmap-layer:layout-update` event wiring and `meta.heatmap = this` stay in the
+subclass.
+
+To build a new GPU overlay (e.g. footprint grid, predictive-liquidation
+heatmap): `class Foo extends GpuOverlay`, push quads, wire your own layout
+event. `ht.js` is an older near-duplicate of the same machinery and is a
+candidate to fold onto `GpuOverlay` later.
 
 ## Cursor-aware overlays & the heatmap (Phase 1.1 follow-up)
 
