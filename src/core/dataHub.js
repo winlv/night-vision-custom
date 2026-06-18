@@ -20,7 +20,12 @@ class DataHub {
         // EVENT INTERFACE
         events.on('hub:set-scale-index', this.onScaleIndex.bind(this))
         events.on('hub:display-overlay', this.onDisplayOv.bind(this))
+        events.on('hub:pane-resize-start', this.onPaneResizeStart.bind(this))
         events.on('hub:pane-resize', this.onPaneResize.bind(this))
+        events.on('hub:move-pane', this.onMovePane.bind(this))
+        // Cache the latest full layout so pane-resize can read every pane's
+        // current pixel height (needed to seed weights without a visual jump).
+        events.on('hub:update-pane', l => this._lastLayout = l)
 
     }
 
@@ -214,35 +219,71 @@ class DataHub {
 
 
 
+    // Called once when a resize gesture starts (mousedown on the handle).
+    // Converts EVERY pane's `settings.height` to its current PIXEL height, so
+    // the drag math below is in pixel space no matter what the heights held
+    // before (auto/null, small relative weights, or pixels from a prior drag).
+    // Re-seeding to pixels is render-neutral: weightedHs is proportional, so
+    // pixel weights reproduce the exact same layout — no jump.
+    onPaneResizeStart() {
+        const panes = this.data.panes;
+        const L = this._lastLayout;
+        if (!panes || !L || !L.grids) return;
+        if (L.grids.length !== panes.length) return; // stale layout — don't corrupt
+        for (let i = 0; i < panes.length; i++) {
+            const g = L.grids[i];
+            if (g && g.height) panes[i].settings.height = g.height;
+        }
+    }
+
+    // Resize the boundary between a pane and the one directly above it.
+    // The resizer handle sits at the TOP edge of `pane`, so dragging it down
+    // grows the pane ABOVE and shrinks `pane` (and vice-versa). Only the two
+    // adjacent panes change — everything else stays put. Heights are in pixels
+    // here (seeded by onPaneResizeStart), so the boundary tracks the cursor 1:1.
     onPaneResize(event) {
         const { paneId, deltaPx } = event;
 
         const panes = this.panes();
         const pane = panes[paneId];
-        if (!pane) return;
+        const above = panes[paneId - 1];
+        if (!pane || !above) return;
 
-        // const Hpx = totalHeightPx;
-        const Hpx = this.se.chart.height;
+        const ah = pane.settings.height, bh = above.settings.height;
+        if (ah == null || bh == null) return; // gesture not seeded yet — bail
 
-        const weights = panes.map(p => p.settings.height ?? 1);
-        const W = weights.reduce((a, b) => a + b, 0);
+        const MIN = 28; // px — minimum pane height
+        let d = deltaPx;
+        // Clamp so neither adjacent pane drops below MIN (prevents "sticking"
+        // where hitting the limit would abort the whole drag).
+        d = Math.max(d, -(bh - MIN));
+        d = Math.min(d, (ah - MIN));
+        if (!d) return;
 
-        const deltaW = (-deltaPx / Hpx) * W;
+        above.settings.height = bh + d;
+        pane.settings.height = ah - d;
 
-        const minW = 0.05;
+        this.events.emitSpec('chart', 'update-layout');
+    }
 
-        const next = (pane.settings.height ?? 1) + deltaW;
-        if (next < minW) return;
-
-        const main = panes[this.mainPaneId];
-        if (main && main !== pane) {
-            const mainNext = (main.settings.height ?? 1) - deltaW;
-            if (mainNext < minW) return;
-            main.settings.height = mainNext;
-        }
-
-        pane.settings.height = next;
-
+    // Reorder panes (move a pane up/down). Swaps the entries in data.panes;
+    // the order change flips the panes-hash, so update() routes to a full
+    // rebuild that re-indexes ids + remakes the grids in the new order.
+    // Each pane keeps its own settings.height, so sizes travel with the pane.
+    onMovePane(event) {
+        const { paneId, dir } = event;
+        const panes = this.data.panes;
+        if (!panes) return;
+        const j = paneId + dir;
+        if (j < 0 || j >= panes.length) return;
+        // The main (chart) pane stays fixed on top: never move it, and never
+        // move another pane across it. Placing a sub-pane ABOVE the main pane
+        // glitches the layout, so it's disallowed here (and disabled in the UI).
+        const isMain = (pn) => pn && pn.overlays && pn.overlays.some(o => o.main);
+        if (isMain(panes[paneId]) || isMain(panes[j])) return;
+        const t = panes[paneId];
+        panes[paneId] = panes[j];
+        panes[j] = t;
         this.events.emitSpec('chart', 'update-layout');
     }
 

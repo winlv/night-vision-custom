@@ -1,61 +1,69 @@
 <script>
-    import { createEventDispatcher } from 'svelte';
     import Events from "../core/events.js";
-    const dispatch = createEventDispatcher();
+
     export let props;
     export let id;
-
-    let events = Events.instance(props.id)
-
-    let startY, startHeightPx;
     export let layout = {}
 
+    let events = Events.instance(props.id)
+    let startY = 0
 
     function onMouseDown(e) {
         startY = e.clientY;
-        startHeightPx = layout.height;
+        events.emit('cursor-locked', true)
+        // Seed all pane heights to pixels for this gesture (pixel-space drag).
+        events.emitSpec('hub', 'pane-resize-start', {})
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = 'ns-resize'
     }
 
     function onMouseMove(e) {
         const deltaPx = e.clientY - startY;
+        if (!deltaPx) return;
         startY = e.clientY;
-
-        events.emitSpec('hub', 'pane-resize', { paneId: id, deltaPx, layout })
+        // deltaPx > 0 (drag down) → pane above grows, this pane shrinks.
+        events.emitSpec('hub', 'pane-resize', { paneId: id, deltaPx });
     }
 
     function onMouseUp() {
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = ''
+        events.emit('cursor-locked', false)
     }
-
-    $:style = `
-    // bottom: ${layout.height}px;
-      `
 </script>
 
 <div class="resizer-wrapper">
-    <div class="pane-resizer" on:mousedown={onMouseDown} {style} ></div>
+    <div class="pane-resizer"
+         style="--line:{props.colors.scale}; --hover:{props.colors.cross}"
+         on:mousedown|preventDefault={onMouseDown}></div>
 </div>
 
 <style>
     .resizer-wrapper {
         height: 100%;
-        display: block;
         position: relative;
     }
+    /* Wide invisible grab zone straddling the pane boundary, thin visible line */
     .pane-resizer {
-        height: 3px;
-        cursor: ns-resize;
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
+        top: -4px; left: 0; right: 0;
+        height: 9px;
+        cursor: ns-resize;
         z-index: 100;
-        background: #424242;
     }
-    .pane-resizer:hover {
-        background: rgba(100, 100, 255, 0.5);
+    .pane-resizer::after {
+        content: '';
+        position: absolute;
+        left: 0; right: 0; top: 4px;
+        height: 1px;
+        background: var(--line);
+        transition: height .08s ease, background .08s ease, top .08s ease;
+    }
+    .pane-resizer:hover::after {
+        top: 3px;
+        height: 3px;
+        background: var(--hover);
     }
 </style>

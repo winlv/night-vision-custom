@@ -49,16 +49,9 @@ let canvas // Canvas ref
 let ctx // Canvas context
 let input // Input attacher to the renderer
 
-// Phase 1.2: rAF batching. Multiple `update-rr` events within one frame are
-// coalesced into a single paint via a dirty flag + one requestAnimationFrame.
-let dirty = false
-let pendingLayout = layout
-let rafId = null
-
 onMount(() => { setup() })
 onDestroy(() => {
     events.off(`${rrUpdId}`)
-    if (rafId !== null) cancelAnimationFrame(rafId)
     if (input) input.destroy()
 })
 
@@ -92,22 +85,9 @@ function setup() {
 
 }
 
-// Schedule a paint (coalesced to one per frame). Use draw() directly only
-// when a synchronous repaint is required (e.g. right after a resize).
+// Synchronous repaint (no rAF batching — it added input latency to discrete
+// wheel zoom, which already coalesces upstream via changeRange's rAF).
 function update($layout = layout) {
-    pendingLayout = $layout
-    dirty = true
-    if (rafId === null) rafId = requestAnimationFrame(flush)
-}
-
-function flush() {
-    rafId = null
-    if (!dirty) return
-    dirty = false
-    draw(pendingLayout)
-}
-
-function draw($layout = layout) {
 
     layout = $layout
 
@@ -160,7 +140,7 @@ function upperBorder() {
 function resizeWatch() {
     if (!canvas) return
     dpr.resize(canvas, ctx, layout.width, layout.height)
-    draw() // sync — avoid a blank frame after the canvas is resized/cleared
+    update()
 }
 
 </script>

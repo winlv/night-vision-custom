@@ -27,6 +27,7 @@ export default class Text {
     }
 
     draw(ctx) {
+        if (this.data && this.data.hidden) return
         if (this.typing) return;
 
         const { x, y, text, textSize, textColor } = this.data;
@@ -90,6 +91,7 @@ export default class Text {
     }
 
     mousedown(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         if (this.collision() && this.core.meta.tool === 'Cursor') {
             const layout = this.core.layout;
             this.drag.t = this.data.x;
@@ -103,6 +105,7 @@ export default class Text {
     }
 
     mousemove(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.hover = this.collision();
 
         if (this.drag.mStartT !== null) {
@@ -120,6 +123,7 @@ export default class Text {
     }
 
     mouseup() {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.drag.mStartT = null;
         this.drag.mStartV = null;
         this.core.events.emit('scroll-lock', false);

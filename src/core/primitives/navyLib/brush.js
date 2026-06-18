@@ -15,6 +15,7 @@ export default class Brush {
     }
 
     draw(ctx) {
+        if (this.data && this.data.hidden) return
         this.curve.update(this.data);
 
         ctx.beginPath();
@@ -74,6 +75,7 @@ export default class Brush {
     }
 
     mousedown(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         if (this.collision()) {
             if (this.core.meta.tool !== 'Cursor') {
                 return void 0;
@@ -91,6 +93,7 @@ export default class Brush {
     }
 
     mouseup(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.state = 'settled';
         this.drag = {t: undefined, v: undefined};
         this.hover = false;
@@ -101,6 +104,7 @@ export default class Brush {
     }
 
     mousemove(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
             return void 0;
         }

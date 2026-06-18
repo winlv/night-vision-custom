@@ -74,6 +74,15 @@ function make(event) {
     layers = makeLayers()
     renderers = mergeByCtx()
 
+    // A renderer is "cursor-aware" if any of its overlays reacts to the cursor
+    // (has a mousemove handler), e.g. HeatmapZoom's magnifier/info window. Such
+    // renderers must repaint on the light cursor path (see updateCursor), or
+    // their cursor-driven visuals would freeze after the Phase 1.1 decouple.
+    for (var rr of renderers) {
+        rr.cursorAware = rr.layers.some(l =>
+            l.overlay && typeof l.overlay.mousemove === 'function')
+    }
+
     // Attach input to the last renderer
     let last = renderers[renderers.length - 1]
     if (last) setTimeout(() => {
@@ -220,7 +229,10 @@ function update($layout = layout) {
 function updateCursor($layout = layout) {
     if (input) input.layout = $layout
     for (var rr of renderers) {
-        if (rr.ctxType === 'Overlay') {
+        // Repaint the crosshair/drawings ('Overlay') AND any cursor-aware
+        // renderer (e.g. the one holding HeatmapZoom) so cursor-driven visuals
+        // stay live without a full update.
+        if (rr.ctxType === 'Overlay' || rr.cursorAware) {
             events.emitSpec(`rr-${id}-${rr.id}`, 'update-rr', $layout)
         }
     }

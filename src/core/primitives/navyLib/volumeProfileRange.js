@@ -26,6 +26,7 @@ export default class VolumeProfileRange {
     }
 
     draw(ctx) {
+        if (this.data && this.data.hidden) return
         this.shape.update(this.data.p1, this.data.p2);
 
         const layout = this.core.layout;
@@ -188,6 +189,7 @@ export default class VolumeProfileRange {
     }
 
     mousedown(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.propagate('mousedown', event);
 
         if (this.collision()) {
@@ -202,6 +204,7 @@ export default class VolumeProfileRange {
     }
 
     mouseup(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         this.state = this.pins.some(p => p.state === 'tracking') ? 'tracking' : 'settled';
         this.propagate('mouseup', event);
         this.drag.t = null;
@@ -209,6 +212,7 @@ export default class VolumeProfileRange {
     }
 
     mousemove(event) {
+        if (this.data && (this.data.hidden || this.data.locked)) return
         if (this.core.meta.selectedTool && this.core.meta.selectedTool !== this.data.uuid) {
             return;
         }

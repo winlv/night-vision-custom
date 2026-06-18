@@ -95,6 +95,66 @@ in sync** with `layoutFn.js` (Phase 0 fixed a drift here).
 - `interface.destroy()` disconnects the ResizeObserver and nulls `this.comp` so
   the `this.comp?.getChart()` guards short-circuit.
 
+## Pane resizing (2026-06-16 rewrite)
+
+The drag handle is `Resizer.svelte`, rendered as the last (in-flow) child of each
+non-main `.nvjs-grid`, so it sits at the pane's TOP boundary. It emits
+`hub:pane-resize {paneId, deltaPx}` (and `cursor-locked` to suppress panning while
+dragging). `DataHub.onPaneResize` resizes the boundary between `pane[paneId]` and
+`pane[paneId-1]` (the pane directly above) — NOT the main pane. At the START of every drag gesture (`hub:pane-resize-start`, fired on mousedown)
+it re-seeds EVERY pane's `settings.height` to its current pixel height (read from
+the cached full layout via `hub:update-pane`). This is the critical bit:
+`settings.height` is a relative WEIGHT for `layout.js weightedHs`, so a dataset
+that ships small weights (`height: 1/2/3`) would otherwise make the pixel-based
+drag math jump on the first move. Re-seeding to pixels each gesture is
+render-neutral (weightedHs is proportional) and makes the boundary track the
+cursor 1:1 regardless of prior values. Deltas are clamped so neither adjacent
+pane drops below 28 px (no "sticking"). Heights stay relative weights, so window
+resizes keep proportions, and a pane keeps its size when reordered.
+
+Test datasets: `data/data-3panes.json` (Candles + RSI + MACD, weights 3/1/1) and
+`data/data-4panes.json` (+ Stoch) — multi-pane fixtures with pre-set weights,
+loadable from the App toolbar ("3 panes" / "4 panes").
+
+**Reordering:** `Legend.svelte` shows ▲/▼ buttons (when >1 pane) that emit
+`hub:move-pane {paneId, dir}`. `DataHub.onMovePane` swaps the two entries in
+`data.panes`; the order change flips the panes-hash (`dataScanner.calcPanesHash`
+is order-sensitive), so `Chart.update()` routes to `fullUpdate` → re-index +
+remake-grid in the new order. `settings.height` rides with each pane, so sizes
+travel when a pane moves. Up is disabled on the top pane, down on the bottom.
+**The main (chart) pane is pinned on top:** `DataHub.onMovePane` rejects any swap
+that involves the main pane (so sub-panes can never be placed above it — doing so
+glitched the layout), and `Legend.svelte` disables the arrows accordingly (both on
+the main pane, and "up" on the pane directly below it). Enforced centrally in
+DataHub, so any UI that emits `hub:move-pane` is covered.
+
+## Cursor-aware overlays & the heatmap (Phase 1.1 follow-up)
+
+The cursor decouple (1.1) repaints only the dynamic 'Overlay' canvas on hover:
+
+- **Cursor-driven Canvas overlays** (e.g. `HeatmapZoom`, which draws a magnifier /
+  info window from `$core.cursor` in its `draw()`) stopped updating on hover,
+  because they sit on the static 'Canvas' renderer. Fix: `Grid` flags a renderer
+  `cursorAware` if any of its overlays has a `mousemove` handler, and
+  `updateCursor` repaints `'Overlay'` **and** `cursorAware` renderers. Only
+  HeatmapZoom/ht define `mousemove` among overlays (grid uses `mousedown`,
+  trackers only `draw`, candles none), so normal charts keep the hover perf win;
+  heatmap charts repaint their Canvas on hover (their prior behavior — needed for
+  the magnifier). `$core.cursor` is the live cursor ref, so no env update needed.
+- Heatmap `layoutUpdate` runs synchronously in `Grid.update`, in lockstep with the
+  (now synchronous) candle canvas. (A rAF-batching/defer experiment was reverted —
+  it added input latency to wheel zoom.)
+
+## Zoom note (reverted experiment)
+
+A wheel-zoom animation (X ease + Y `smoothY` lerp) and rAF render batching were
+tried and **reverted**: the rAF batching added a frame of input latency, and the
+wheel path already coalesces upstream (changeRange's rAF), so discrete wheel zoom
+felt laggy. `Canvas.update` is now synchronous again, and the heatmap
+`layoutUpdate` runs synchronously in lockstep. The residual vertical "jump" on
+wheel zoom is inherent to discrete-step zoom + price auto-scale (present in the
+original too); continuous gestures (pan, axis drag) don't show it.
+
 ## Test surfaces
 
 - `src/App.svelte` — manual dev page (toolbar + chart). The user's hands-on

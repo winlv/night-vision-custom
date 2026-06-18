@@ -199,8 +199,10 @@
         persistObj(node)
     }
     function persistObj(node) {
-        const ov = node.ovRef
-        chart.events.emit('change-tool-data', { data: ov.dataExt, id: ov.id })
+        // The hidden/locked flag is mutated on the shared shape object, so a
+        // redraw is enough to apply it. We must NOT emit 'change-tool-data'
+        // with ov.dataExt — that's an OBJECT, and metaHub.changeToolData would
+        // assign it to ov.data, breaking tool yRange's `$core.data.slice(...)`.
         chart.update('layout')
         treeRefresh++
     }
@@ -281,6 +283,12 @@
         } else if (kind === 'large') {
             d = { panes: [{ overlays: [{ name: 'Synthetic 100k', type: 'Candles', data: genCandles(100000) }] }] }
             label = 'synthetic 100k'; chart.indexBased = false
+        } else if (kind === '3panes') {
+            d = (await import('../data/data-3panes.json')).default; label = '3 panes (RSI+MACD)'
+            chart.indexBased = false
+        } else if (kind === '4panes') {
+            d = (await import('../data/data-4panes.json')).default; label = '4 panes (RSI+MACD+Stoch)'
+            chart.indexBased = false
         }
         dataLabel = label
         scaleMode = 'linear'
@@ -403,6 +411,8 @@
         <button on:click={() => loadData('small')}>small 1k</button>
         <button on:click={() => loadData('medium')}>medium 4k</button>
         <button on:click={() => loadData('large')}>large 100k</button>
+        <button on:click={() => loadData('3panes')}>3 panes</button>
+        <button on:click={() => loadData('4panes')}>4 panes</button>
         <button class:active={realtime} on:click={toggleRealtime}>{realtime ? '⏸ realtime' : '▶ realtime'}</button>
 
         <div class="grp-title">Indicators</div>
