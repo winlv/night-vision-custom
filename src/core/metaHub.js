@@ -4,6 +4,8 @@
 import Events from './events.js'
 import DataHub from './dataHub.js'
 import Heatmap from "./primitives/heatmap.js";
+import GpuCandles from "./primitives/gpuCandles.js";
+import GpuOverlay from "./primitives/gpuOverlay.js";
 
 class MetaHub {
 
@@ -151,8 +153,33 @@ class MetaHub {
         this.events.emit('commit-tool-changes');
     }
 
+    // --- GPU overlays -----------------------------------------------------
+    // All init* methods are FAIL-SAFE: they return the overlay instance, or
+    // null when the GPU is unavailable (chart root not in the DOM yet,
+    // per-page context budget exhausted, WebGL creation failed). They never
+    // throw and never leak a WebGL context. Callers (navy scripts / hosts)
+    // must check the result and fall back to Canvas-2D on null.
+    //
+    // A short cooldown stops per-frame retry storms: overlay draw() runs on
+    // every layout update, and before this guard a failing init would leak
+    // resources 60x per second until the browser killed the page's contexts.
+
+    _gpuInit(make) {
+        if (this._gpuFailTs && Date.now() - this._gpuFailTs < 2000) return null;
+        try {
+            const ov = make();
+            this._gpuFailTs = 0;
+            return ov;
+        } catch (e) {
+            this._gpuFailTs = Date.now();
+            console.warn('nvjs: GPU overlay init failed, using canvas fallback:', e.message || e);
+            return null;
+        }
+    }
+
     initHeatmap(id) {
-        this.heatmap = new Heatmap(id);
+        if (!this.heatmap) this.heatmap = this._gpuInit(() => new Heatmap(id)) || undefined;
+        return this.heatmap || null;
     }
 
     destroyHeatmap() {
@@ -162,8 +189,39 @@ class MetaHub {
         }
     }
 
+    initGpuCandles(id) {
+        if (!this.gpuCandles) this.gpuCandles = this._gpuInit(() => new GpuCandles(id)) || undefined;
+        return this.gpuCandles || null;
+    }
+
+    destroyGpuCandles() {
+        if (this.gpuCandles) {
+            this.gpuCandles.destroy();
+            this.gpuCandles = undefined;
+        }
+    }
+
+    // Generic instanced-quad overlay for arbitrary colored cells
+    // (footprint / TPO clusters push their filled cells here).
+    initGpuClusters(id) {
+        if (!this.gpuClusters) {
+            this.gpuClusters = this._gpuInit(() => new GpuOverlay(id, {
+                maxInstances: 120000,
+                className: 'nvjs-gpu-clusters',
+            })) || undefined;
+        }
+        return this.gpuClusters || null;
+    }
+
+    destroyGpuClusters() {
+        if (this.gpuClusters) {
+            this.gpuClusters.destroy();
+            this.gpuClusters = undefined;
+        }
+    }
+
     resetHeatmap() {
-        this.heatmap.reset();
+        if (this.heatmap && this.heatmap.clear) this.heatmap.clear();
     }
 
     // User tapped grid (& deselected all overlays)

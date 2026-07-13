@@ -164,6 +164,78 @@ heatmap): `class Foo extends GpuOverlay`, push quads, wire your own layout
 event. `ht.js` is an older near-duplicate of the same machinery and is a
 candidate to fold onto `GpuOverlay` later.
 
+### GpuCandles — prototype candle renderer (A/B)
+
+`src/core/primitives/gpuCandles.js` is the first non-heatmap consumer of the
+base: a WebGL candle renderer. A candle is just rectangles, so each one becomes
+up to 3 quads (volume bar, 1px wick, body); `render(core, showVolume)` mirrors
+`layoutCnvFast.js` geometry (`price * A + B`, `ti2x`, `CANDLEW`, `VOLSCALE`,
+log-scale via `math.log`) so positions match the Canvas-2D candles exactly, then
+`beginFrame()/addQuad()/endFrame()`. Color strings are parsed once and cached.
+
+It runs as a drop-in overlay type: `src/scripts/GpuCandles.navy` (`ctx=Canvas`,
+same `yRange/ohlc/valueTracker/legendHtml` as `candles.navy`) whose `draw()`
+paints nothing on the 2D ctx and instead calls `meta.gpuCandles.render($core)`.
+Lifecycle is host-owned: `MetaHub.initGpuCandles(id)` / `destroyGpuCandles()`
+(the navy `draw()` no-ops when `meta.gpuCandles` is absent, so a stale draw
+during a type-switch can't resurrect the instance). **App toggle:**
+`App.svelte` "GPU (proto)" button swaps the main overlay between `Candles` and
+`GpuCandles` for 1:1 A/B comparison (target: the 100k full-zoom-out case).
+
+Prototype caveats: GPU canvas sits *behind* the Canvas-2D layers (like the
+heatmap), so grid/indicators draw over the candles; thin wicks aren't
+pixel-snapped (mild AA blur); re-uploads the whole buffer on every range change
+(no stage-transform pan yet).
+
+`render(core, showVolume, colors)` takes an optional `colors` override
+(`{candleUp, candleDw, wickUp, wickDw, volUp, volDw}`) so a consumer overlay can
+pass its own props palette instead of `core.colors`. The instance is torn down
+in `Chart.svelte` onDestroy (`meta.destroyGpuCandles()`), alongside the heatmap.
+
+**Consumed in tradehive-ui** (`CandlesPlus`, `CandlesCustom` navy scripts): a
+`gpuRender` prop (def true) routes draw() to `meta.gpuCandles.render(...)` with
+a safe Canvas-2D fallback when the library build lacks the API; OFF clears the
+GPU buffer. ⚠️ **Each GPU-rendered chart creates one Pixi WebGL context** —
+browsers cap live contexts (~16), so pages that mount many CandlesPlus charts
+(watchlist grid, per-exchange arbitrage) must pass `gpuRender:false` in those
+overlays' props. Single charts (main terminal, bookmap) are fine.
+
+### GPU overlay lifecycle on reset
+
+`NightVision.fullReset()` calls `meta.destroyGpuCandles()` + `meta.destroyGpuClusters()`
+before the `update('full')`. Reason: these overlays cache a Pixi context + a
+canvas appended to the chart root; a symbol switch (host does `data.panes = ...;
+fullReset()`) can rebuild the chart DOM/layout and leave the cached canvas blank
+or detached → candles/clusters render nothing after switching coin. Tearing them
+down on reset means the candle/cluster scripts lazily recreate a fresh,
+correctly-attached instance on their next draw (verified: after a simulated
+switch the instance is recreated, attached, rendering, and there's exactly one
+canvas — no accumulation). The heatmap is exempt (the host destroys/reinits it
+itself). All GPU-candle/cluster scripts therefore use lazy init
+(`if (!meta.gpuX) meta.initGpuX($core.props.id)`).
+
+### gpuClusters — footprint / TPO cells
+
+`meta.gpuClusters` is a plain `GpuOverlay` instance (`initGpuClusters(id)` /
+`destroyGpuClusters()`, torn down in Chart.svelte) used as a generic colored-cell
+layer. The bookmap `CandlesFootprints` and `CandlesTPO` navy scripts route their
+cell **fills** to it: each `draw()` does `gpu.beginFrame()` → `gpu.addQuad(x,y,w,h,
+r,g,b,a)` per cell (color via `gpu.parseColor(cssColor)`, the d3 gradient string)
+→ `gpu.endFrame()`. The begin/end bracket the whole draw (not behind the
+`view.length<=80` / timeframe guards) so the buffer is always committed — a
+zoomed-out frame clears stale cells. **Text labels, cell borders and the TPO POC
+outline stay on Canvas-2D** (GPU base has no text/stroke). Same `gpuRender` prop +
+fallback (a `fillLut()`/`fillEmpty()` helper fills a GPU quad or a `ctx.fillRect`).
+Caveat: cells sit on the GPU canvas behind Canvas-2D, so grid lines draw over them.
+
+**Perf note (footprint):** for cell-heavy overlays the cost is the per-frame
+**processing**, not GPU rasterization. Two traps fixed in `CandlesFootprints.navy`:
+(1) the global-max scan must not walk all `$core.data` every frame — cache it and
+rescan only when the candle count changes (fold the in-progress last candle in
+cheaply); (2) never build a d3 color scale per cell — build a 256-entry color LUT
+(RGBA for GPU + css for Canvas-2D) once per draw and index it. Measured ~45×
+faster (29.6 → 0.65 ms/frame at 4000 candles × 120 levels, 60 visible).
+
 ## Cursor-aware overlays & the heatmap (Phase 1.1 follow-up)
 
 The cursor decouple (1.1) repaints only the dynamic 'Overlay' canvas on hover:

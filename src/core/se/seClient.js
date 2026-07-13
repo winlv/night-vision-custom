@@ -148,6 +148,14 @@ let instances = {}
 function instance(id, chart) {
     if (!instances[id]) {
         instances[id] = new SeClient(id, chart)
+    } else if (chart) {
+        // The singleton outlives NightVision instances. When the host destroys
+        // a chart and creates a new one with the SAME id (page re-open, full
+        // rebuild), refresh the refs — otherwise `se.chart` keeps pointing at
+        // the destroyed instance whose `root` is null, and everything that
+        // reads `se.chart.root` (e.g. GPU overlays) breaks on every frame.
+        instances[id].chart = chart
+        instances[id].ww = chart.ww
     }
     return instances[id]
 }

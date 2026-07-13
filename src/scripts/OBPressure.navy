@@ -1,0 +1,118 @@
+// Navy ~ 0.2-lite
+
+// <ds>Order book pressure: liquidity zones above/below price</ds>
+// format: [<timestamp>, <close>,
+//          <a1>, <a2>, <a3>,    // ask zone boundaries (above price, ascending)
+//          <b1>, <b2>, <b3>,    // bid zone boundaries (below price, descending)
+//          <ia1>, <ia2>, <ia3>, // ask zone intensities 0..1 (close..a1, a1..a2, a2..a3)
+//          <ib1>, <ib2>, <ib3>] // bid zone intensities 0..1 (close..b1, b1..b2, b2..b3)
+
+[OVERLAY name=OBPressure, ctx=Canvas, version=1.0.0, author=Tradehive]
+
+// Overlay props
+prop('askColor', { type: 'color', def: '#d94d64' })
+prop('bidColor', { type: 'color', def: '#3ba976' })
+prop('maxOpacity', { type: 'number', def: 0.45 })
+prop('drawLines', { type: 'boolean', def: true })
+prop('lineColor', { type: 'color', def: '#78788c40' })
+prop('lineWidth', { type: 'number', def: 1 })
+
+// Draw call
+draw(ctx) {
+    const layout = $core.layout
+    const data = $core.data
+    const view = $core.view
+
+    // Zone fills: [innerBoundaryIndex, outerBoundaryIndex, intensityIndex]
+    // Ask zones fill up from close, bid zones fill down from close
+    const askZones = [[1, 2, 8], [2, 3, 9], [3, 4, 10]]
+    const bidZones = [[1, 5, 11], [5, 6, 12], [6, 7, 13]]
+
+    for (var i = view.i1, n = view.i2; i <= n; i++) {
+        let p1 = data[i]
+        let p2 = data[i + 1]
+        if (!p2) continue
+        let x1 = layout.ti2x(p1[0], i)
+        let x2 = layout.ti2x(p2[0], i + 1)
+        fillZones(ctx, layout, p1, p2, x1, x2, askZones, $props.askColor)
+        fillZones(ctx, layout, p1, p2, x1, x2, bidZones, $props.bidColor)
+    }
+
+    if (!$props.drawLines) return
+    ctx.lineWidth = $props.lineWidth
+    ctx.strokeStyle = $props.lineColor
+    ctx.lineJoin = 'round'
+    for (var bi of [2, 3, 4, 5, 6, 7]) {
+        ctx.beginPath()
+        for (var i = view.i1, n = view.i2; i <= n; i++) {
+            let p = data[i]
+            let v = p[bi]
+            if (v !== v || v === undefined) continue // NaN gap
+            ctx.lineTo(layout.ti2x(p[0], i), layout.value2y(v))
+        }
+        ctx.stroke()
+    }
+}
+
+fillZones(ctx, layout, p1, p2, x1, x2, zones, color) {
+    for (var z of zones) {
+        let int1 = p1[z[2]]
+        if (!int1 || int1 <= 0.01) continue
+        let yIn1 = layout.value2y(p1[z[0]])
+        let yOut1 = layout.value2y(p1[z[1]])
+        let yIn2 = layout.value2y(p2[z[0]] !== undefined ? p2[z[0]] : p1[z[0]])
+        let yOut2 = layout.value2y(p2[z[1]] !== undefined ? p2[z[1]] : p1[z[1]])
+        if (yIn1 !== yIn1 || yOut1 !== yOut1) continue // NaN
+        ctx.beginPath()
+        ctx.fillStyle = alphaColor(color, Math.min(int1, 1) * $props.maxOpacity)
+        ctx.moveTo(x1, yIn1)
+        ctx.lineTo(x2 + 0.1, yIn2)
+        ctx.lineTo(x2 + 0.1, yOut2)
+        ctx.lineTo(x1, yOut1)
+        ctx.fill()
+    }
+}
+
+// '#rrggbb' + alpha 0..1 -> '#rrggbbaa'
+alphaColor(color, alpha) {
+    let a = Math.max(0, Math.min(1, alpha))
+    let hex = Math.round(a * 255).toString(16)
+    if (hex.length < 2) hex = '0' + hex
+    return color.slice(0, 7) + hex
+}
+
+// Precision sampling (outermost boundaries)
+preSampler(x) => [x[4], x[7]]
+
+// Only the price boundaries define the y-range,
+// intensity columns (0..1) must not affect the scale
+let initialLow = 0;
+let initialHigh = 0;
+yRange() {
+    const updData = $core.hub.mainOv.data.slice(-500);
+    let len = updData.length;
+
+    var h, l, high = -Infinity, low = Infinity
+    if (initialLow && initialHigh) {
+        low = initialLow;
+        high = initialHigh;
+    } else {
+        for(var i = 0; i < len; i++) {
+            let point = updData[i];
+            if (!point) {
+                break;
+            }
+            if (point[2] > high) high = point[2];
+            if (point[3] < low) low = point[3];
+        }
+        initialLow = low;
+        initialHigh = high;
+    }
+    return [high, low]
+}
+
+// Legend: max ask/bid zone pressure, %
+legend(x) => [
+    [Math.round(Math.max(x[8] || 0, x[9] || 0, x[10] || 0) * 100), $props.askColor],
+    [Math.round(Math.max(x[11] || 0, x[12] || 0, x[13] || 0) * 100), $props.bidColor]
+]

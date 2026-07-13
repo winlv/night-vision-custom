@@ -28,6 +28,7 @@
     let magnet = false
     let scaleMode = 'linear'
     let chartType = 'Candles'
+    let useGpu = false  // GpuCandles (WebGL) prototype vs Canvas-2D candles
     let rawOHLC = null  // time-based source series, preserved across type switches
     let baseIndexBased = true  // the dataset's natural index/time mode
     let realtime = false
@@ -229,6 +230,7 @@
 
     function setChartType(type) {
         chartType = type
+        if (useGpu) { useGpu = false; chart.meta.destroyGpuCandles() }
         const ov = mainOverlay()
         if (type === 'Candles' || type === 'HeikinAshi') {
             ov.type = type            // both render the raw time-based OHLCV
@@ -243,6 +245,22 @@
             ov.data = Utils.rangeBars(rawOHLC, autoBrick(rawOHLC))
             chart.indexBased = true
         }
+        chart.fullReset()
+        chart.se.uploadAndExec()
+    }
+
+    // GpuCandles prototype A/B toggle. Swaps the main overlay between the
+    // Canvas-2D `Candles` and the WebGL `GpuCandles` (which lazily creates its
+    // GPU overlay instance on first draw via $core.meta.initGpuCandles).
+    function toggleGpuCandles() {
+        useGpu = !useGpu
+        const ov = mainOverlay()
+        ov.type = useGpu ? 'GpuCandles' : 'Candles'
+        ov.data = rawOHLC
+        chart.indexBased = baseIndexBased
+        chartType = 'Candles'   // reset the chart-type highlight
+        if (useGpu) chart.meta.initGpuCandles(chart.id)
+        else chart.meta.destroyGpuCandles()
         chart.fullReset()
         chart.se.uploadAndExec()
     }
@@ -402,6 +420,9 @@
         <button class:active={chartType === 'HeikinAshi'} on:click={() => setChartType('HeikinAshi')}>heikin ashi</button>
         <button class:active={chartType === 'Renko'} on:click={() => setChartType('Renko')}>renko</button>
         <button class:active={chartType === 'RangeBars'} on:click={() => setChartType('RangeBars')}>range bars</button>
+
+        <div class="grp-title">GPU (proto)</div>
+        <button class:active={useGpu} on:click={toggleGpuCandles}>{useGpu ? '⚡ GPU candles ON' : 'GPU candles OFF'}</button>
 
         <div class="grp-title">Scale</div>
         <button class:active={scaleMode === 'linear'} on:click={() => setScale('linear')}>linear</button>

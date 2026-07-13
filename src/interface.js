@@ -228,6 +228,14 @@ class NightVision {
 
     // Reset everything
     fullReset() {
+        // GPU overlays (candles / clusters) cache a Pixi context + a canvas
+        // appended to the chart root. A full reset (e.g. symbol switch) can
+        // rebuild the chart DOM/layout out from under them, leaving a blank or
+        // detached canvas. Tear them down here; the candle/cluster scripts
+        // lazily recreate a fresh instance on their next draw (same pattern the
+        // heatmap uses). Heatmap itself is managed by the host, so it's left.
+        this.meta.destroyGpuCandles()
+        this.meta.destroyGpuClusters()
         this.update('full', {resetRange: true})
     }
 

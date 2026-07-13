@@ -159,7 +159,7 @@ function makeLayers() {
     // TODO: check order if overlay list is changed
     // TODO: switch Grid/X from the pane settings
     layers.push(new Crosshair(i++, props.id))
-    layers.push(new Grid(i++, props.id))
+    layers.push(new Grid(i++, props.id, id === 0))
     layers.push(new Trackers(i++, props, id))
     // layers.push(new Heatmap(i++, props.id));
     // if (main) {

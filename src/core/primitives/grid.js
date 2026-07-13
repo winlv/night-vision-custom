@@ -2,21 +2,24 @@
 import Layer from '../layer.js'
 import Const from '../../stuff/constants.js'
 import Events from '../events.js'
+import MetaHub from '../metaHub.js'
 
 const HPX = Const.HPX;
 
 export default class Grid extends Layer {
 
-    constructor(id, nvId) {
+    constructor(id, nvId, mainPane = false) {
         super(id, '__$Grid__', nvId)
 
         this.events = Events.instance(this.nvId)
+        this.meta = MetaHub.instance(this.nvId)
         this.events.on(`grid-layer:show-grid`, this.onShowHide.bind(this))
 
         this.id = id
         this.zIndex = -1000000
         this.ctxType = 'Canvas'
         this.show = true
+        this.mainPane = mainPane
 
         this.doubleClickThreshold = 350;
         this.distThreshold = 15;
@@ -38,6 +41,12 @@ export default class Grid extends Layer {
     draw(ctx) {
         let layout = this.layout
         if (!layout || !this.show) return
+
+        // With GPU candles the whole WebGL canvas sits BELOW the Canvas-2D
+        // layers, so a grid drawn here would land on top of the candle
+        // bodies. GpuCandles draws the main-pane grid itself (under the
+        // candles); skip the 2D grid for that pane only.
+        if (this.mainPane && this.meta.gpuCandles) return
 
         ctx.strokeStyle = this.props.colors.grid
         ctx.beginPath()
@@ -64,6 +73,8 @@ export default class Grid extends Layer {
 
     onShowHide(flag) {
         this.show = flag
+        // Mirror for GPU renderers (GpuCandles draws the main-pane grid).
+        this.meta.gridShown = flag
     }
 
     destroy() {

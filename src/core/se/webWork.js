@@ -15,6 +15,7 @@ class WebWork {
 
     start() {
         if (this.worker) this.worker.terminate()
+        this.stopped = false
         this.worker = new WebWorker()
         //this.worker = new Worker(new URL('./worker.js', import.meta.url), {
         //    type: 'module',
@@ -101,6 +102,7 @@ class WebWork {
 
     stop() {
         if (this.worker) this.worker.terminate()
+        this.stopped = true
     }
 }
 
@@ -110,6 +112,13 @@ let instances = {}
 function instance(id, chart) {
     if (!instances[id]) {
         instances[id] = new WebWork(id, chart)
+    } else {
+        // Singleton outlives NightVision instances: refresh the chart ref and
+        // revive the worker if a previous chart.destroy() terminated it —
+        // otherwise a chart re-created with the same id gets a dead script
+        // engine (overlays never execute).
+        if (chart) instances[id].chart = chart
+        if (instances[id].stopped) instances[id].start()
     }
     return instances[id]
 }

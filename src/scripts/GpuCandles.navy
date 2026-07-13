@@ -1,0 +1,85 @@
+
+// NavyJS ~ 0.2-lite
+
+// <ds>GPU-rendered japanese candles (prototype)</ds>, format:
+// [<timestamp>, <open>, <high>, <low>, <close>, <?volume>]
+//
+// Same data/scale/legend as Candles, but the bodies/wicks/volume are drawn on
+// a WebGL canvas (GpuCandles, built on GpuOverlay) that sits behind the
+// Canvas-2D layers. This overlay's draw() pushes geometry to the GPU and paints
+// nothing on the 2D context — it's an A/B prototype next to candles.navy.
+
+[OVERLAY name=GpuCandles, ctx=Canvas, version=1.0.0]
+
+prop('colorBodyUp', { type: 'color', def: $core.colors.candleUp })
+prop('colorBodyDw', { type: 'color', def: $core.colors.candleDw })
+prop('showVolume', { type: 'boolean', def: true })
+prop('currencySymbol', { type: 'string', def: '$' })
+prop('scaleSymbol', { type: 'string|boolean', def: false })
+prop('priceLine', { type: 'boolean', def: true })
+prop('showValueTracker', { type: 'boolean', def: true })
+
+// Draw call: push candle geometry to the GPU; nothing is drawn on `ctx`.
+// Lazily (re)creates the instance — fullReset() tears it down on symbol/type
+// switches, and this recreates a fresh, correctly-attached one on next draw.
+draw(ctx) {
+    // initGpuCandles returns null when the GPU is unavailable (no chart root
+    // yet / context budget / WebGL failure) — skip the frame instead of
+    // crashing the layer; the next draw retries after the cooldown.
+    let gpu = $core.meta.gpuCandles || $core.meta.initGpuCandles($core.props.id)
+    if (gpu) gpu.render($core, $props.showVolume)
+}
+
+// Define y-range (by finding max High, min Low)
+static yRange(data) {
+    let len = data.length
+    var h, l, high = -Infinity, low = Infinity
+    for(var i = 0; i < len; i++) {
+        let point = data[i]
+        if (point[2] > high) high = point[2]
+        if (point[3] < low) low = point[3]
+    }
+    return [high, low]
+}
+
+// Use [Open, Close] for precision detection
+static preSampler(x) => [x[1], x[4]]
+
+// Map data item to OHLC (for candle magnets etc.)
+ohlc(x) => [x[1], x[2], x[3], x[4]]
+
+// Price label + Scale symbol + price line
+valueTracker(x) => {
+    show: $props.showValueTracker,
+    symbol: $props.scaleSymbol,
+    line: $props.priceLine,
+    color: $lib.candleColor($props, $core.data[$core.data.length - 1]),
+    value: x[4] // close
+}
+
+// Define the OHLCV legend
+legendHtml(x, prec, f) {
+    let color1 = $core.colors.text
+    let sym = $props.currencySymbol
+    let color2 = x[4] >= x[1] ?
+        $props.colorBodyUp : $props.colorBodyDw
+    let fc = $lib.formatCash
+
+    return `
+    <span style="color: ${color2}">
+        <span style="margin-left: 3px;"></span>
+        <span style="color: ${color1}">O</span>
+        <span class="nvjs-ll-value">${f(x[1])}</span>
+        <span style="color: ${color1}">H</span>
+        <span class="nvjs-ll-value">${f(x[2])}</span>
+        <span style="color: ${color1}">L</span>
+        <span class="nvjs-ll-value">${f(x[3])}</span>
+        <span style="color: ${color1}">C</span>
+        <span class="nvjs-ll-value">${f(x[4])}</span>
+    `
+    + ($props.showVolume ? `
+        <span style="color: ${color1}">V</span>
+        <span class="nvjs-ll-value">${sym+fc(x[5])}</span>` : ``)
+    + `<span style="color: ${color1}; margin-left: 4px;">⚡GPU</span>`
+    + `</span>`
+}

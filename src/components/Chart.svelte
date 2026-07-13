@@ -86,6 +86,8 @@ onMount(() => {
 onDestroy(() => {
     // Clean-up event listeners on 'chart' component
     meta.destroyHeatmap();
+    meta.destroyGpuCandles();
+    meta.destroyGpuClusters();
     events.off('chart')
 })
 
