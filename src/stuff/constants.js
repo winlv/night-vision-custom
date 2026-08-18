@@ -89,7 +89,8 @@ const ChartConfig = {
     IS_DIGASH: false,
     DRAW_SIGNAL_LEVEL_BUTTON: true,
     ZOOM_X_SENS: 0.5,
-    ZOOM_Y_SENS: 0.4
+    ZOOM_Y_SENS: 0.4,
+    SHOW_CURSOR_DISTANCE: true, // Show cursor-to-last-price distance (%) near the crosshair
 }
 
 ChartConfig.FONT =

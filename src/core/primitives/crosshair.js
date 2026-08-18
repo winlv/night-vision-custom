@@ -6,6 +6,7 @@ import Layer from '../layer.js'
 import Const from '../../stuff/constants.js'
 import Events from "../events.js";
 import MetaHub from "../metaHub.js";
+import DataHub from "../dataHub.js";
 
 const HPX = Const.HPX
 
@@ -28,6 +29,7 @@ export default class Crosshair extends Layer {
         this.signalLevelActionHover = false;
         this.actionSize = 22;
         this.meta = MetaHub.instance(nvId)
+        this.hub = DataHub.instance(nvId)
 
         this.overlay = {
             draw: this.draw.bind(this),
@@ -101,7 +103,95 @@ export default class Crosshair extends Layer {
             this.drawAddSignalLevelButton(ctx, cursor);
         }
 
+        this.drawCursorDistance(ctx, cursor)
+
         ctx.restore()
+    }
+
+    // Distance (%) between the cursor price and the last price of the
+    // main overlay, drawn as bare text next to the crosshair.
+    // Toggled by config.SHOW_CURSOR_DISTANCE (on by default).
+    drawCursorDistance(ctx, cursor) {
+
+        if (this.props.config.SHOW_CURSOR_DISTANCE === false) return
+
+        // Only meaningful on the main grid: other panes hold indicator
+        // values, not prices, so a % distance to the last price is noise
+        if (!this.layout.main || cursor.gridId !== this.layout.id) return
+
+        const last = this.lastValue()
+        if (last === undefined || !isFinite(last) || Math.abs(last) < 1e-12) return
+
+        const $ = this.layout.y2value(cursor.y)
+        if (!isFinite($)) return
+
+        const dist = ($ - last) / last * 100
+        const lbl = `${dist > 0 ? '+' : ''}${dist.toFixed(2)}%`
+
+        ctx.save()
+        ctx.setLineDash([])
+        ctx.font = this.props.config.FONT
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'middle'
+
+        // Bare text, no plate behind it. The color follows the crosshair,
+        // so recoloring the crosshair recolors the readout with it.
+        const h = 12
+        const gap = 8
+        const w = Math.ceil(ctx.measureText(lbl).width)
+
+        // Default spot: right of the vertical line, above the horizontal one
+        let x = cursor.x + gap
+        let y = cursor.y - gap - h / 2
+
+        // Flip to the left of the cursor when the text would run into the
+        // right edge (or into the add-signal-level button that lives there)
+        const rightPad = this.props.config.DRAW_SIGNAL_LEVEL_BUTTON ?
+            this.actionSize + 4 : 2
+        if (x + w > this.layout.width - rightPad) x = cursor.x - gap - w
+        if (x < 2) x = 2
+
+        // Flip below the cursor when there is no room above
+        if (y - h / 2 < 2) y = cursor.y + gap + h / 2
+        if (y + h / 2 > this.layout.height - 2) y = this.layout.height - 2 - h / 2
+
+        ctx.fillStyle = this.props.colors.cross
+        ctx.fillText(lbl, x, y)
+
+        ctx.restore()
+    }
+
+    // Last value of the main overlay (the one the price line tracks)
+    lastValue() {
+
+        const chart = this.hub.chart
+        const mainOv = this.hub.mainOv
+        if (!chart || !mainOv) return undefined
+
+        const data = mainOv.data
+        if (!data || !data.length) return undefined
+
+        const point = data[data.length - 1]
+        if (!point) return undefined
+
+        // Prefer the overlay's own value tracker: it is what draws the
+        // price line, so the chip always agrees with what's on screen
+        const ovId = chart.overlays.indexOf(mainOv)
+        const vt = (this.meta.valueTrackers[this.hub.mainPaneId] || [])[ovId]
+        if (typeof vt === 'function') {
+            try {
+                let t = vt(point)
+                if (Array.isArray(t)) {
+                    t = t.find(x => x && x.show && x.value !== undefined)
+                }
+                if (t && t.value !== undefined) return t.value
+            } catch (e) {
+                // Fall back to the raw data point below
+            }
+        }
+
+        // Candles => close, plain series => value
+        return point.length >= 5 ? point[4] : point[1]
     }
 
     mousemove(event) {
