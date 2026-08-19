@@ -44,6 +44,10 @@ class GpuContext {
             resolution: window.devicePixelRatio || 1,
             autoStart: false,             // render on demand only
             sharedTicker: false,
+            // Keep the drawing buffer readable after compositing. Without it
+            // toDataURL()/drawImage() on this canvas returns blank, which is
+            // why GPU layers came out empty in chart screenshots.
+            preserveDrawingBuffer: true,
         });
 
         try {

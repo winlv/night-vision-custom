@@ -86,17 +86,22 @@ class MetaHub {
     }
 
     handleKeyboardDown(event) {
-        if (event.ctrlKey) {
+        if (event.ctrlKey || event.metaKey) {
             this.magnet = true;
         }
     }
 
     handleKeyboardUp(event) {
-        this.magnet = false;
+        // Drop the magnet only when the modifier itself is no longer held.
+        // Keying off "any keyup" killed the magnet mid-drawing whenever the
+        // user released some other key (e.g. Shift) with Ctrl still down.
+        if (!event.ctrlKey && !event.metaKey) {
+            this.magnet = false;
+        }
     }
 
     get isMagnetActive() {
-        return this.magnet || this.magnet;
+        return this.magnet;
     }
 
     toolSelected = (event) => {
